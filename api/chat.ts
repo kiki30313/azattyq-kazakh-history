@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { ApiError, GoogleGenAI } from '@google/genai'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 type VercelRequest = IncomingMessage & { body: unknown }
@@ -132,31 +132,68 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return respondError(response, 429, 'Сұрау шегіне жеттіңіз. Кейінірек қайталап көріңіз.')
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
-  const model = process.env.OPENAI_MODEL
-  if (!apiKey || !model) {
+  const apiKey = process.env.GEMINI_API_KEY
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
+  if (!apiKey) {
     return respondError(response, 503, 'AI қызметі әлі конфигурацияланбаған.')
   }
 
   try {
-    const openai = new OpenAI({ apiKey, timeout: 25_000, maxRetries: 0 })
-    const result = await openai.responses.create({
-      model,
-      instructions,
-      input: chatMessages,
-      max_output_tokens: 900,
+    const gemini = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        timeout: 25_000,
+        retryOptions: { attempts: 1 },
+      },
     })
-    const answer = result.output_text.trim()
+    const result = await gemini.models.generateContent({
+      model,
+      contents: chatMessages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content }],
+      })),
+      config: {
+        systemInstruction: instructions,
+        maxOutputTokens: 900,
+        httpOptions: {
+          timeout: 25_000,
+          retryOptions: { attempts: 1 },
+        },
+      },
+    })
+    const answer = result.text?.trim()
     if (!answer) return respondError(response, 502, 'AI қызметі бос жауап қайтарды.')
     return response.status(200).json({ answer })
   } catch (error) {
-    if (error instanceof OpenAI.APIConnectionTimeoutError) {
+    if (error instanceof ApiError) {
+      if (error.status === 400 && /api[\s_-]*key.*(?:invalid|not valid)|(?:invalid|not valid).*api[\s_-]*key/i.test(error.message)) {
+        return respondError(response, 503, 'Gemini API кілті жарамсыз. Vercel-дегі GEMINI_API_KEY параметрін тексеріңіз.')
+      }
+      if (error.status === 401) {
+        return respondError(response, 503, 'Gemini API кілті жарамсыз немесе мерзімі өткен. Vercel-дегі GEMINI_API_KEY параметрін тексеріңіз.')
+      }
+      if (error.status === 403) {
+        return respondError(response, 503, 'Gemini API бұл жобаға рұқсат бермеді. API баптауын және қолжетімділікті тексеріңіз.')
+      }
+      if (error.status === 404) {
+        return respondError(response, 503, 'Көрсетілген Gemini моделі табылмады. GEMINI_MODEL мәнін тексеріңіз.')
+      }
+      if (error.status === 429) {
+        return respondError(response, 429, 'Gemini сұрау немесе тегін квота шегіне жетті. AI Studio квотасын тексеріп, кейінірек қайталап көріңіз.')
+      }
+      if (error.status === 408 || error.status === 504) {
+        return respondError(response, 504, 'Gemini API жауабын күту уақыты аяқталды. Қысқалау сұрақпен қайталап көріңіз.')
+      }
+      if (error.status >= 500) {
+        return respondError(response, 502, 'Gemini API уақытша қолжетімсіз. Кейінірек қайталап көріңіз.')
+      }
+      console.error('History tutor Gemini API request failed', { status: error.status })
+      return respondError(response, 502, 'Gemini сұрауын орындау мүмкін болмады. Сұрақты тексеріп, қайталап көріңіз.')
+    }
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       return respondError(response, 504, 'AI қызметінен жауап күту уақыты аяқталды.')
     }
-    if (error instanceof OpenAI.APIError && error.status === 429) {
-      return respondError(response, 429, 'AI сұрау шегі аяқталды. Кейінірек қайталап көріңіз.')
-    }
-    console.error('History tutor request failed', error instanceof OpenAI.APIError ? { status: error.status, code: error.code } : { name: error instanceof Error ? error.name : 'UnknownError' })
+    console.error('History tutor Gemini request failed', { name: error instanceof Error ? error.name : 'UnknownError' })
     return respondError(response, 502, 'AI қызметінен жауап алу мүмкін болмады.')
   }
 }
