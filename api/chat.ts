@@ -63,7 +63,7 @@ const allowRequestOrigin = (request: VercelRequest, response: VercelResponse) =>
 const isRateLimited = (request: VercelRequest) => {
   const forwardedFor = request.headers['x-forwarded-for']
   const clientIp = typeof forwardedFor === 'string'
-    ? forwardedFor.split(',').at(-1)?.trim() || 'unknown'
+    ? forwardedFor.split(',').pop()?.trim() || 'unknown'
     : 'unknown'
   const now = Date.now()
 
