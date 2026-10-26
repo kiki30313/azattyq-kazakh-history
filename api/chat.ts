@@ -1,4 +1,4 @@
-import { ApiError, GoogleGenAI } from '@google/genai'
+import { ApiError, FinishReason, GoogleGenAI } from '@google/genai'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 type VercelRequest = IncomingMessage & { body: unknown }
@@ -17,9 +17,36 @@ const MAX_MESSAGES = 20
 const MAX_MESSAGE_LENGTH = 4000
 const RATE_WINDOW_MS = 10 * 60 * 1000
 const RATE_LIMIT = 12
+const MAX_OUTPUT_TOKENS = 2048
+const GENERATION_BUDGET_MS = 31_000
+const MAX_REQUEST_TIMEOUT_MS = 25_000
+const RETRY_DELAYS_MS = [300, 700]
 const rateBuckets = new Map<string, { count: number; resetAt: number }>()
 
-const instructions = `Сен — Қазақстан тарихы бойынша виртуалды оқытушысың. Қазақ жеріндегі ұлт-азаттық көтерілістерді ғылыми тұрғыда түсіндіресің. Қазақ және орыс тілдерінде сауатты жауап бересің. Тарихи даталарды, тұлғаларды, себептерді, оқиғалар барысын, нәтижелер мен салдарды түсіндіресің. Нақты факт пен тарихи интерпретацияны ажыратасың. Сенімді дерек болмаса, оны ашық айтасың. Тарихи деректерді ойдан шығармайсың. Жауаптарың түсінікті, құрылымды және студентке пайдалы болсын. Қажет кезде қысқаша қорытынды мен тексеруге болатын дереккөздерді ұсын. Пайдаланушы қазақша сұраса — қазақша, орысша сұраса — орысша жауап бер.`
+const instructions = `Сен — Қазақстан тарихынан сабақ беретін виртуалды оқытушысың. Қазақ жеріндегі ұлт-азаттық көтерілістерді ғылыми тұрғыда түсіндір. Қазақ және орыс тілдерінде сауатты жауап бер; әрдайым соңғы пайдаланушы хабарламасының тілін анықтап, сол тілде жауап бер. Әңгіме тілін алдыңғы хабарламаларға қарап өзгертпе: соңғы хабарламадағы тіл басым болсын, ал тіл қысқа не екіұшты болса, алдыңғы диалогтың тілін сақта. «Сәлем», «привет», «ало», «хм», «кімсің?» сияқты қысқа тұрмыстық хабарламаларға сол тілде табиғи әрі қысқа жауап бер; өз мүмкіндіктеріңді ұзақ тізбелеме және бірдей таныстыруды қайталама. Тарихи сұрақтарға даталарды, тұлғаларды, себептерді, оқиғалар барысын, нәтижелер мен салдарды түсінікті әрі құрылымды түсіндір. Нақты факт пен тарихи интерпретацияны ажырат, сенімді дерек болмаса ашық айт, факт ойдан шығарма. Қажет кезде қысқаша қорытынды мен тексеруге болатын дереккөздерді ұсын.`
+
+const isRetryableError = (error: unknown) => {
+  if (error instanceof ApiError) {
+    return error.status === 408 || error.status === 429 || (error.status >= 500 && error.status <= 599)
+  }
+  return error instanceof Error
+    && ['AbortError', 'TimeoutError', 'TypeError'].includes(error.name)
+}
+
+const getSafeErrorCode = (error: unknown) => {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return 'INVALID_CREDENTIALS'
+    if (error.status === 403) return 'PERMISSION_DENIED'
+    if (error.status === 404) return 'MODEL_NOT_FOUND'
+    if (error.status === 408) return 'UPSTREAM_TIMEOUT'
+    if (error.status === 429) return 'RATE_LIMITED'
+    if (error.status >= 500) return 'UPSTREAM_ERROR'
+    return 'API_ERROR'
+  }
+  if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name)) return 'TIMEOUT'
+  if (error instanceof Error && error.name === 'TypeError') return 'NETWORK_ERROR'
+  return 'UNKNOWN_ERROR'
+}
 
 const setSecurityHeaders = (response: VercelResponse) => {
   response.setHeader('Cache-Control', 'no-store')
@@ -142,29 +169,62 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const gemini = new GoogleGenAI({
       apiKey,
       httpOptions: {
-        timeout: 25_000,
         retryOptions: { attempts: 1 },
       },
     })
-    const result = await gemini.models.generateContent({
-      model,
-      contents: chatMessages.map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content }],
-      })),
-      config: {
-        systemInstruction: instructions,
-        maxOutputTokens: 900,
-        httpOptions: {
-          timeout: 25_000,
-          retryOptions: { attempts: 1 },
-        },
-      },
-    })
+    const contents = chatMessages.map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: message.content }],
+    }))
+    const deadline = Date.now() + GENERATION_BUDGET_MS
+    let result
+
+    for (let attempt = 0; ; attempt += 1) {
+      const remainingMs = deadline - Date.now()
+      const timeout = Math.min(MAX_REQUEST_TIMEOUT_MS, remainingMs - 1_000)
+      if (timeout <= 0) {
+        const timeoutError = new Error('Gemini request time budget exhausted')
+        timeoutError.name = 'TimeoutError'
+        throw timeoutError
+      }
+
+      try {
+        result = await gemini.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: instructions,
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
+            httpOptions: {
+              timeout,
+              retryOptions: { attempts: 1 },
+            },
+          },
+        })
+        break
+      } catch (error) {
+        const delay = RETRY_DELAYS_MS[attempt]
+        if (!isRetryableError(error) || delay === undefined || Date.now() + delay + 1_000 >= deadline) {
+          throw error
+        }
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+
     const answer = result.text?.trim()
     if (!answer) return respondError(response, 502, 'AI қызметі бос жауап қайтарды.')
+    if (result.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS) {
+      console.warn('History tutor response reached output token limit', {
+        code: 'MAX_OUTPUT_TOKENS_REACHED',
+        finishReason: FinishReason.MAX_TOKENS,
+      })
+    }
     return response.status(200).json({ answer })
   } catch (error) {
+    console.error('History tutor Gemini request failed', {
+      code: getSafeErrorCode(error),
+      status: error instanceof ApiError ? error.status : null,
+    })
     if (error instanceof ApiError) {
       if (error.status === 400 && /api[\s_-]*key.*(?:invalid|not valid)|(?:invalid|not valid).*api[\s_-]*key/i.test(error.message)) {
         return respondError(response, 503, 'Gemini API кілті жарамсыз. Vercel-дегі GEMINI_API_KEY параметрін тексеріңіз.')
@@ -187,13 +247,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
       if (error.status >= 500) {
         return respondError(response, 502, 'Gemini API уақытша қолжетімсіз. Кейінірек қайталап көріңіз.')
       }
-      console.error('History tutor Gemini API request failed', { status: error.status })
       return respondError(response, 502, 'Gemini сұрауын орындау мүмкін болмады. Сұрақты тексеріп, қайталап көріңіз.')
     }
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       return respondError(response, 504, 'AI қызметінен жауап күту уақыты аяқталды.')
     }
-    console.error('History tutor Gemini request failed', { name: error instanceof Error ? error.name : 'UnknownError' })
     return respondError(response, 502, 'AI қызметінен жауап алу мүмкін болмады.')
   }
 }
