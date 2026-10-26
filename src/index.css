@@ -1606,6 +1606,24 @@ img {
   gap: 20px;
 }
 
+.history-tutor {
+  --tutor-paper: #fffdf8;
+  --tutor-paper-soft: #f3ede2;
+  --tutor-ink: #28231d;
+  --tutor-muted: #5c5348;
+  --tutor-line: #c9bdab;
+  color: var(--tutor-ink);
+}
+
+.editorial-main-inner section .history-tutor .text-slate-300,
+.editorial-main-inner section .history-tutor .text-slate-400 {
+  color: var(--tutor-muted) !important;
+}
+
+.editorial-main-inner section .history-tutor .text-white {
+  color: var(--tutor-ink) !important;
+}
+
 .history-tutor-clear,
 .history-tutor-form button {
   display: inline-flex;
@@ -1614,10 +1632,10 @@ img {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid rgba(183, 157, 117, 0.4);
-  background: rgba(183, 157, 117, 0.08);
+  border: 1px solid var(--tutor-line);
+  background: var(--tutor-paper);
   padding: 0 14px;
-  color: #e8d6b7;
+  color: var(--tutor-ink);
   cursor: pointer;
   font-size: 12px;
   transition: border-color 180ms ease, background 180ms ease, opacity 180ms ease;
@@ -1625,14 +1643,14 @@ img {
 
 .history-tutor-clear:hover,
 .history-tutor-form button:not(:disabled):hover {
-  border-color: #bd795c;
-  background: rgba(163, 76, 50, 0.3);
+  border-color: #8e402b;
+  background: #ead9c5;
 }
 
 .history-tutor-clear:disabled,
 .history-tutor-form button:disabled {
   cursor: not-allowed;
-  opacity: 0.42;
+  opacity: 0.72;
 }
 
 .history-tutor-thread {
@@ -1643,8 +1661,8 @@ img {
   gap: 18px;
   overflow-y: auto;
   margin-top: 22px;
-  border: 1px solid rgba(239, 231, 218, 0.12);
-  background: rgba(17, 16, 14, 0.35);
+  border: 1px solid var(--tutor-line);
+  background: var(--tutor-paper-soft);
   padding: clamp(16px, 3vw, 26px);
   scroll-behavior: smooth;
 }
@@ -1666,7 +1684,7 @@ img {
   margin-bottom: 13px;
   border: 1px solid rgba(183, 157, 117, 0.45);
   border-radius: 50%;
-  color: #c39b76;
+  color: #82402d;
   font-family: var(--display);
   font-size: 20px;
 }
@@ -1683,10 +1701,10 @@ img {
 
 .history-tutor-examples button,
 .history-tutor-followups button {
-  border: 1px solid rgba(183, 157, 117, 0.3);
-  background: rgba(183, 157, 117, 0.06);
+  border: 1px solid #b8a68e;
+  background: var(--tutor-paper);
   padding: 9px 12px;
-  color: #d8c8ae;
+  color: #332b22;
   cursor: pointer;
   font-size: 11px;
   text-align: left;
@@ -1695,8 +1713,8 @@ img {
 
 .history-tutor-examples button:hover,
 .history-tutor-followups button:hover {
-  border-color: #bd795c;
-  color: #f0d1b5;
+  border-color: #8e402b;
+  color: #542519;
 }
 
 .history-tutor-followups {
@@ -1716,7 +1734,7 @@ img {
 .history-tutor-message-label {
   display: block;
   margin-bottom: 6px;
-  color: #bd9671;
+  color: #75432c;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -1727,19 +1745,23 @@ img {
 }
 
 .history-tutor-message-content {
-  border: 1px solid rgba(239, 231, 218, 0.12);
-  background: rgba(239, 231, 218, 0.045);
+  border: 1px solid var(--tutor-line);
+  background: var(--tutor-paper);
   padding: 14px 16px;
-  color: #e4ddd1;
+  color: var(--tutor-ink);
   font-size: 13px;
   line-height: 1.75;
   overflow-wrap: anywhere;
 }
 
 .history-tutor-message-user .history-tutor-message-content {
-  border-color: rgba(183, 157, 117, 0.24);
-  background: rgba(163, 76, 50, 0.12);
-  color: #f0e5d6;
+  border-color: #b28e6d;
+  background: #ead9c5;
+  color: #2f261e;
+}
+
+.history-tutor-message-content p {
+  color: inherit !important;
 }
 
 .history-tutor-answer p + p,
@@ -1758,7 +1780,7 @@ img {
 }
 
 .history-tutor-answer strong {
-  color: #f0c6a0;
+  color: #71351f;
   font-weight: 700;
 }
 
@@ -1768,7 +1790,7 @@ img {
   align-items: center;
   gap: 9px;
   align-self: flex-start;
-  color: #cabb9f;
+  color: #514638;
   font-size: 12px;
 }
 
@@ -1777,10 +1799,10 @@ img {
 }
 
 .history-tutor-error {
-  border: 1px solid rgba(189, 121, 92, 0.3);
-  background: rgba(163, 76, 50, 0.12);
+  border: 1px solid #b7795e;
+  background: #f4e4d8;
   padding: 12px;
-  color: #edc0a6;
+  color: #612e1d;
 }
 
 .history-tutor-form {
@@ -1789,8 +1811,8 @@ img {
   align-items: flex-end;
   gap: 10px;
   margin-top: 12px;
-  border: 1px solid rgba(239, 231, 218, 0.18);
-  background: rgba(17, 16, 14, 0.38);
+  border: 1px solid var(--tutor-line);
+  background: var(--tutor-paper);
   padding: 10px 10px 28px;
 }
 
@@ -1802,14 +1824,14 @@ img {
   border: 0;
   background: transparent;
   padding: 8px;
-  color: #efe7da;
+  color: var(--tutor-ink);
   font-size: 13px;
   line-height: 1.6;
   outline: none;
 }
 
 .history-tutor-form textarea::placeholder {
-  color: #908577;
+  color: #62594f;
 }
 
 .history-tutor-form button {
@@ -1824,12 +1846,62 @@ img {
   position: absolute;
   right: 124px;
   bottom: 9px;
-  color: #908577;
+  color: #62594f;
   font-size: 10px;
 }
 
 @keyframes history-tutor-spin {
   to { transform: rotate(360deg); }
+}
+
+.editorial-site.dark .history-tutor {
+  --tutor-paper: #302a22;
+  --tutor-paper-soft: #25211c;
+  --tutor-ink: #f0e7da;
+  --tutor-muted: #c9bda9;
+  --tutor-line: #625545;
+}
+
+.editorial-site.dark .editorial-main-inner section .history-tutor .text-slate-300,
+.editorial-site.dark .editorial-main-inner section .history-tutor .text-slate-400 {
+  color: var(--tutor-muted) !important;
+}
+
+.editorial-site.dark .editorial-main-inner section .history-tutor .text-white {
+  color: var(--tutor-ink) !important;
+}
+
+.editorial-site.dark .history-tutor-examples button,
+.editorial-site.dark .history-tutor-followups button {
+  border-color: #71614d;
+  background: #302a22;
+  color: #f0e7da;
+}
+
+.editorial-site.dark .history-tutor-message-content {
+  color: var(--tutor-ink);
+}
+
+.editorial-site.dark .history-tutor-message-user .history-tutor-message-content {
+  border-color: #8b654a;
+  background: #493629;
+  color: #fff0df;
+}
+
+.editorial-site.dark .history-tutor-message-label,
+.editorial-site.dark .history-tutor-answer strong {
+  color: #e0ad82;
+}
+
+.editorial-site.dark .history-tutor-error {
+  border-color: #a95f48;
+  background: #432820;
+  color: #ffe0ca;
+}
+
+.editorial-site.dark .history-tutor-form textarea,
+.editorial-site.dark .history-tutor-clear {
+  color: var(--tutor-ink);
 }
 
 @keyframes hero-rise {
