@@ -2,6 +2,13 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/login", "destination": "/" },
+    { "source": "/register", "destination": "/" },
+    { "source": "/reset-password", "destination": "/" },
+    { "source": "/profile", "destination": "/" },
+    { "source": "/admin", "destination": "/" }
+  ],
   "functions": {
     "api/chat.ts": {
       "maxDuration": 35

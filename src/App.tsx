@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  AlertCircle,
   ArrowRight,
   BookOpenText,
   BrainCircuit,
-  CheckCircle2,
   Clock3,
   Globe,
   MapPinned,
@@ -20,7 +18,12 @@ import {
   X,
 } from 'lucide-react'
 import steppeArtwork from './assets/steppe-hero.svg'
+import heroPhoto from '../d6069ace81b84925.webp'
 import HistoryTutor, { type ChatMessage } from './components/HistoryTutor'
+import { AdminDashboard, AuthPage, StudentDashboard } from './components/AccountPages'
+import { AuthProvider } from './components/AuthContext'
+import { useAuth } from './components/useAuth'
+import VerifiedQuiz from './components/VerifiedQuiz'
 
 type TimelineEvent = {
   year: string
@@ -64,13 +67,6 @@ type GlossaryItem = {
   example: string
 }
 
-type QuizQuestion = {
-  question: string
-  options: string[]
-  answer: string
-  explanation: string
-}
-
 type DetectiveCase = {
   question: string
   options: { label: string; text: string }[]
@@ -99,7 +95,7 @@ const navItems = [
   { id: 'result', label: 'Нәтиже' },
 ] as const
 
-type PageId = (typeof navItems)[number]['id']
+type PageId = (typeof navItems)[number]['id'] | 'login' | 'register' | 'reset-password' | 'profile' | 'admin'
 
 const primaryNav: { id: PageId; label: string }[] = [
   { id: 'home', label: 'Басты бет' },
@@ -119,7 +115,11 @@ const pageAliases: Record<string, PageId> = {
 }
 
 const getPageFromHash = (): PageId => {
-  const hash = window.location.hash.slice(1)
+  const hash = window.location.hash.slice(1).replace(/^\/+/, '')
+  if (['login', 'register', 'reset-password', 'profile', 'admin'].includes(hash)) return hash as PageId
+  const path = window.location.pathname.replace(/\/+$/, '').split('/').pop() ?? ''
+  const pathPage = ['login', 'register', 'reset-password', 'profile', 'admin'].find((page) => page === path)
+  if (pathPage) return pathPage as PageId
   return navItems.find((item) => item.id === hash)?.id ?? pageAliases[hash] ?? 'home'
 }
 
@@ -222,19 +222,6 @@ const glossary: GlossaryItem[] = [
   { term: 'Ұлттық дербестік', definition: 'Халықтың өз билігі, мәдениеті, қоғамы мен құқықтары мен өмір салтының толық сақталуы.', example: 'Кенесары көтерілісінің идеологиялық қозғаушы күші ұлттық дербестік идеясы болды.' },
 ]
 
-const quizQuestions: QuizQuestion[] = [
-  { question: 'Кенесары Қасымұлы көтерілісі қашан басталды?', options: ['1837', '1836', '1841', '1916'], answer: '1837', explanation: 'Кенесары көтерілісі 1837 жылы басталды және 1847 жылға дейін созылды.' },
-  { question: 'Сырым Датұлы көтерілісіне қай жылы сәйкес келеді?', options: ['1783–1797', '1800–1805', '1836–1838', '1847–1849'], answer: '1783–1797', explanation: 'Сырым Датұлы көтерілісі 1783–1797 жылдар аралығында болды.' },
-  { question: 'Ақмола бекінісіне шабуыл қай жылы жасалды?', options: ['1838', '1822', '1841', '1868'], answer: '1838', explanation: 'Ақмола бекінісіне шабуыл 1838 жылы өтті.' },
-  { question: 'Кенесарының хан сайлануы қай жылы болды?', options: ['1841', '1836', '1824', '1916'], answer: '1841', explanation: 'Кенесары 1841 жылы хан ретінде қолданысқа ие болды.' },
-  { question: 'Көтерілістің аяқталуы қай жылы белгіленеді?', options: ['1847', '1838', '1867', '1841'], answer: '1847', explanation: 'Кенесары көтерілісі 1847 жылы бүкіл көлемде басып-жанумен аяқталды.' },
-  { question: 'Исатай Тайманұлы мен Махамбет Өтемісұлы қозғалысы қай жылдарға тиесілі?', options: ['1836–1838', '1824–1828', '1847–1850', '1916–1917'], answer: '1836–1838', explanation: 'Бұл қозғалыс 1836–1838 жылдары болды.' },
-  { question: 'Кенесары көтерілісінің ұлт-азаттық сипатын неден анықтаймыз?', options: ['Халықтың дербестік үшін күресі', 'Бір ғана дәмді тағам', 'Салықтарды азайту', 'Шаруаларға жүрулікті шектеу'], answer: 'Халықтың дербестік үшін күресі', explanation: 'Көтеріліс жер, билік және ұлттық дербестік үшін ұйымдастырылды.' },
-  { question: 'Ресейдің негізгі әскери басқару нүктесі қайда орналасқан?', options: ['Ақмола бекінісі', 'Париж', 'Стамбул', 'Мәскеу'], answer: 'Ақмола бекінісі', explanation: 'Ақмола бекінісі Ресейдің әскери-әкімшілік нүктесі ретінде маңызды роль атқарды.' },
-  { question: 'Кенесары көтерілісінің басты бағыты қандай?', options: ['Азаматтық және саяси дербестік', 'Тек өнеркәсіп', 'Тек қала тұрғыны', 'Әскери озаттық'], answer: 'Азаматтық және саяси дербестік', explanation: 'Көтеріліс заңды билік, жер, ұлттық тәуелсіздік үшін өрбіді.' },
-  { question: 'Көтерілісті жойып жіберген факторлардың бірі?', options: ['Ресейдің әскери басымдылығы', 'Ерекше табиғат', 'Тек шетелдік достар', 'Халықтың толық келісімі'], answer: 'Ресейдің әскери басымдылығы', explanation: 'Ресейдің әскери, логистикалық және әкімшілік ресурстары көтерілісін басуға жеткілікті болды.' },
-]
-
 const matchingPairs = [
   { id: 'syrim', label: 'Сырым Датұлы көтерілісі', value: '1783–1797' },
   { id: 'isatay', label: 'Исатай мен Махамбет көтерілісі', value: '1836–1838' },
@@ -289,16 +276,8 @@ const videoLinks = [
   { title: 'Ұлт-азаттық көтерілістер: XIX–XX ғасыр', description: 'Тарихи үрдістің әртүрлі кезеңдерінің салыстырмалы көрінісі.', url: 'https://www.youtube.com/results?search_query=%D2%B1%D0%BB%D1%82+%D0%B0%D0%B7%D0%B0%D1%82%D1%82%D1%8B%D2%9B+%D0%BA%D3%A9%D1%82%D0%B5%D1%80%D1%96%D0%BB%D1%96%D1%81%D1%82%D0%B5%D1%80' },
 ]
 
-const shuffleOptions = (options: string[]) => {
-  const shuffled = [...options]
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1))
-    ;[shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]]
-  }
-  return shuffled
-}
-
 function App() {
+  const { session, profile, isLoading: authLoading } = useAuth()
   const [darkMode, setDarkMode] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -308,12 +287,6 @@ function App() {
   const [factIndex, setFactIndex] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeGame, setActiveGame] = useState(0)
-  const [quizIndex, setQuizIndex] = useState(0)
-  const [quizOptions, setQuizOptions] = useState(() => shuffleOptions(quizQuestions[0].options))
-  const [quizAnswer, setQuizAnswer] = useState<string | null>(null)
-  const [quizSubmitted, setQuizSubmitted] = useState(false)
-  const [quizQuickResult, setQuizQuickResult] = useState<{ correct: boolean; explanation: string } | null>(null)
-  const [quizScore, setQuizScore] = useState(0)
   const [matchingAnswers, setMatchingAnswers] = useState<Record<string, string>>({})
   const [matchingResult, setMatchingResult] = useState<{ correct: number; total: number; score: number } | null>(null)
   const [identitySelected, setIdentitySelected] = useState('')
@@ -393,6 +366,21 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const accountMenuItems: { id: PageId; label: string }[] = session
+    ? [
+        { id: 'profile', label: 'Жеке кабинет' },
+        ...(profile?.role === 'admin' ? [{ id: 'admin' as const, label: 'Әкімші панелі' }] : []),
+      ]
+    : [
+        { id: 'login', label: 'Кіру' },
+        { id: 'register', label: 'Тіркелу' },
+      ]
+  const menuItems = [...navItems, ...accountMenuItems]
+  const desktopAccountItems: { id: PageId; label: string }[] = [
+    { id: session ? 'profile' : 'login', label: session ? 'Кабинет' : 'Кіру' },
+    ...(profile?.role === 'admin' ? [{ id: 'admin' as const, label: 'Әкімші' }] : []),
+  ]
+
   const filteredGlossary = useMemo(() => {
     const value = searchTerm.trim().toLowerCase()
     if (!value) return glossary
@@ -407,39 +395,6 @@ function App() {
   const progressValue = (doneGames / gameTabs.length) * 100
 
   const cycleFact = () => setFactIndex((prev) => (prev + 1) % funFacts.length)
-
-  const handleQuizSubmit = () => {
-    if (!quizAnswer || quizSubmitted) return
-    const current = quizQuestions[quizIndex]
-    const isCorrect = quizAnswer === current.answer
-    const nextScore = Math.min(quizQuestions.length * 10, quizScore + (isCorrect ? 10 : 0))
-    const isFinalQuestion = quizIndex === quizQuestions.length - 1
-
-    setQuizQuickResult({ correct: isCorrect, explanation: current.explanation })
-    setQuizScore(nextScore)
-    setQuizSubmitted(true)
-
-    setGameResults((prev) => ({
-      ...prev,
-      quiz: {
-        done: isFinalQuestion,
-        score: nextScore,
-        correct: prev.quiz.correct + (isCorrect ? 1 : 0),
-        wrong: prev.quiz.wrong + (isCorrect ? 0 : 1),
-        percent: Math.round(((prev.quiz.correct + (isCorrect ? 1 : 0)) / (quizIndex + 1)) * 100),
-      },
-    }))
-  }
-
-  const nextQuizQuestion = () => {
-    if (!quizSubmitted || quizIndex >= quizQuestions.length - 1) return
-    const nextIndex = quizIndex + 1
-    setQuizIndex(nextIndex)
-    setQuizOptions(shuffleOptions(quizQuestions[nextIndex].options))
-    setQuizAnswer(null)
-    setQuizSubmitted(false)
-    setQuizQuickResult(null)
-  }
 
   const handleMatchingSubmit = () => {
     const correctCount = matchingPairs.filter((pair) => matchingAnswers[pair.id] === pair.value).length
@@ -495,16 +450,6 @@ function App() {
     }))
   }
 
-  const resetQuiz = () => {
-    setQuizIndex(0)
-    setQuizOptions(shuffleOptions(quizQuestions[0].options))
-    setQuizAnswer(null)
-    setQuizSubmitted(false)
-    setQuizQuickResult(null)
-    setQuizScore(0)
-    setGameResults((prev) => ({ ...prev, quiz: { done: false, score: 0, correct: 0, wrong: 0, percent: 0 } }))
-  }
-
   const resetMatching = () => {
     setMatchingAnswers({})
     setMatchingResult(null)
@@ -530,45 +475,24 @@ function App() {
   }
 
   const resetAllGames = () => {
-    resetQuiz(); resetMatching(); resetIdentity(); resetOrder(); resetDetective()
+    resetMatching(); resetIdentity(); resetOrder(); resetDetective()
   }
 
   const renderGamePanel = () => {
     const key = gameTabs[activeGame]?.key
 
     if (key === 'quiz') {
-      const currentQuestion = quizQuestions[quizIndex]
       return (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-amber-300">Сұрақ {quizIndex + 1}/{quizQuestions.length}</p>
-            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-200">{quizScore} ұпай</span>
-          </div>
-          <h3 className="text-xl font-semibold text-white">{currentQuestion.question}</h3>
-          <div className="grid gap-3 md:grid-cols-2">
-            {quizOptions.map((option) => (
-              <button key={option} type="button" onClick={() => setQuizAnswer(option)} disabled={quizSubmitted} className={`rounded-2xl border p-4 text-left transition disabled:cursor-default ${quizAnswer === option ? 'border-amber-400 bg-amber-500/10 text-amber-100' : 'border-slate-700 bg-slate-900/50 text-slate-200 hover:border-slate-500'}`}>
-                {option}
-              </button>
-            ))}
-          </div>
-          {!quizSubmitted ? (
-            <button type="button" onClick={handleQuizSubmit} className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-3 font-medium text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400" disabled={!quizAnswer}>
-              <CheckCircle2 size={18} /> Жауапты тексеру
-            </button>
-          ) : (
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-              <div className="mb-2 flex items-center gap-2 text-lg font-medium text-white">
-                {quizQuickResult?.correct ? <CheckCircle2 className="text-emerald-400" size={18} /> : <AlertCircle className="text-rose-400" size={18} />}
-                {quizQuickResult?.correct ? 'Дұрыс жауап!' : 'Қате жауап'}
-              </div>
-              <p className="text-slate-200">{quizQuickResult?.explanation}</p>
-              {quizIndex === quizQuestions.length - 1
-                ? <p className="mt-4 font-semibold text-amber-200">Викторина аяқталды. Нәтижеңіз: {quizScore}/{quizQuestions.length * 10} ұпай. Әр сұраққа бір рет жауап берілді.</p>
-                : <button type="button" onClick={nextQuizQuestion} className="mt-4 rounded-full bg-sky-500 px-4 py-2 text-sm text-white">Келесі сұрақ</button>}
-            </div>
-          )}
-        </div>
+        <VerifiedQuiz key={session?.user.id ?? 'signed-out'} onCompleted={(result) => setGameResults((previous) => ({
+          ...previous,
+          quiz: {
+            done: true,
+            score: result.score,
+            correct: result.correct_count,
+            wrong: result.question_count - result.correct_count,
+            percent: Math.round(result.correct_count / result.question_count * 100),
+          },
+        }))} />
       )
     }
 
@@ -667,6 +591,9 @@ function App() {
             <nav className="desktop-nav" aria-label="Негізгі навигация">
               {primaryNav.map((item, index) => <button key={`${item.label}-${index}`} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</button>)}
             </nav>
+            <nav className="desktop-account-nav" aria-label="Аккаунт">
+              {desktopAccountItems.map((item) => <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</button>)}
+            </nav>
             <div className="header-actions">
               <button type="button" onClick={() => setDarkMode((prev) => !prev)} className="theme-toggle" aria-label="Түстер режимін ауыстыру">{darkMode ? <SunMedium size={17} /> : <Moon size={17} />}</button>
               <button type="button" onClick={() => setMenuOpen((prev) => !prev)} className={`menu-toggle ${menuOpen ? 'menu-toggle-open' : ''}`} aria-label={menuOpen ? 'Мәзірді жабу' : 'Мәзірді ашу'} aria-expanded={menuOpen}><span>{menuOpen ? 'Жабу' : 'Мәзір'}</span>{menuOpen ? <X size={19} /> : <Menu size={19} />}</button>
@@ -675,7 +602,7 @@ function App() {
           {menuOpen && <div className="menu-overlay">
             <div className="menu-overlay-inner">
               <p className="menu-kicker">ТАРИХТЫҢ ІЗІМЕН</p>
-              <div className="menu-link-list">{navItems.map((item, index) => <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'menu-page-link menu-page-link-active' : 'menu-page-link'}><span className="menu-page-number">0{index + 1}</span><span>{item.label}</span><ArrowRight size={19} /></button>)}</div>
+              <div className="menu-link-list">{menuItems.map((item, index) => <button key={`${item.id}-${item.label}`} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'menu-page-link menu-page-link-active' : 'menu-page-link'}><span className="menu-page-number">0{index + 1}</span><span>{item.label}</span><ArrowRight size={19} /></button>)}</div>
               <button type="button" onClick={() => setDarkMode((prev) => !prev)} className="menu-theme-toggle" aria-pressed={darkMode}><span>{darkMode ? 'Жарық тақырыпқа ауысу' : 'Қараңғы тақырыпқа ауысу'}</span>{darkMode ? <SunMedium size={18} /> : <Moon size={18} />}</button>
               <div className="menu-footnote"><span>ҚАЗАҚ ДАЛАСЫ</span><span>1783 — 1916</span></div>
             </div>
@@ -686,7 +613,7 @@ function App() {
           {activePage === 'home' && (
           <div className="home-story">
           <section id="home" className="hero-scene">
-            <img className="hero-art" src={steppeArtwork} alt="Көркемдік панорама: 19 ғасырдағы қазақ даласы мен алыстағы салт аттылар" fetchPriority="high" />
+            <img className="hero-art" src={heroPhoto} alt="Қазақ даласындағы аттылы көрініс" fetchPriority="high" />
             <div className="hero-shade" />
             <div className="hero-meta hero-meta-top"><span>ЦИФРЛЫҚ ТАРИХИ ЗЕРТТЕУ</span><span>01 / 04</span></div>
             <div className="hero-copy">
@@ -701,7 +628,7 @@ function App() {
             </div>
             <div className="hero-period"><span>ҚАРСЫЛЫҚТЫҢ ҒАСЫРЛАРЫ</span><strong>1783 <i>—</i> 1916</strong></div>
             <button type="button" className="hero-scroll" onClick={() => document.getElementById('story-intro')?.scrollIntoView({ behavior: 'smooth' })}><span>ТӨМЕН ЖЫЛЖЫТЫҢЫЗ</span><i /></button>
-            <span className="hero-art-credit">Түпнұсқа көркемдік иллюстрация</span>
+            <span className="hero-art-credit">ҚАЗАҚ ДАЛАСЫНДАҒЫ АТТЫЛЫ КӨРІНІС</span>
           </section>
 
           <section id="story-intro" className="story-intro editorial-section">
@@ -852,9 +779,10 @@ function App() {
           {activePage === 'games' && (
           <section id="games" className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
             <div className="mb-6 flex items-center gap-3"><Sparkles className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Интерактивті ойын</p><h2 className="text-3xl font-bold text-white">Тарихты ойын арқылы үйрен</h2></div></div>
+            <p className="mb-5 max-w-3xl text-sm leading-6 text-slate-300">Тарихи викторинаның ұпайы серверде тексеріліп, профиліңізге сақталады. Қалған төрт шағын ойын — осы сессияға арналған жаттығулар; олардың ұпайы рейтингке қосылмайды.</p>
             <div className="mb-5 flex flex-wrap gap-2">{gameTabs.map((game, index) => <button key={game.key} type="button" onClick={() => setActiveGame(index)} className={`rounded-full px-4 py-2 text-sm font-medium transition ${activeGame === index ? 'bg-amber-400 text-slate-900' : 'border border-slate-700 bg-slate-950 text-slate-200'}`}>{game.label}</button>)}</div>
             <div className="rounded-[24px] border border-slate-700 bg-slate-950/60 p-5">{renderGamePanel()}</div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">{gameTabs.map((game) => { const result = gameResults[game.key]; return <div key={game.key} className="rounded-[18px] border border-slate-700 bg-slate-950/50 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">{game.label}</p><p className="mt-2 text-xl font-bold text-white">{result.score} ұпай</p><p className="text-sm text-slate-300">{result.done ? 'Аяқталды' : 'Орындалмады'}</p></div>})}</div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">{gameTabs.map((game) => { const result = gameResults[game.key]; return <div key={game.key} className="rounded-[18px] border border-slate-700 bg-slate-950/50 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">{game.label}</p><p className="mt-2 text-xl font-bold text-white">{result.score} {game.key === 'quiz' ? 'серверлік ұпай' : 'жаттығу ұпайы'}</p><p className="text-sm text-slate-300">{result.done ? 'Аяқталды' : 'Орындалмады'}</p></div>})}</div>
           </section>
           )}
 
@@ -872,9 +800,29 @@ function App() {
 
           {activePage === 'result' && (
           <section id="result" className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
-            <div className="mb-6 flex items-center gap-3"><Trophy className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Қорытынды нәтиже</p><h2 className="text-3xl font-bold text-white">Жалпы білім деңгейі</h2></div></div>
-            {allGamesDone ? <div className="space-y-5"><div className="grid gap-4 md:grid-cols-4"><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Жалпы ұпай</p><p className="mt-2 text-3xl font-bold text-white">{totalScore}</p></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Ең жоғары ұпай</p><p className="mt-2 text-3xl font-bold text-white">{Math.max(...Object.values(gameResults).map((item) => item.score))}</p></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Дұрыс жауаптар</p><p className="mt-2 text-3xl font-bold text-white">{Object.values(gameResults).reduce((sum, item) => sum + item.correct, 0)}</p></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Деңгей</p><p className="mt-2 text-3xl font-bold text-white">{finalLevel}</p></div></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-5"><p className="text-lg font-semibold text-white">Білім деңгейі: {finalLevel}</p><p className="mt-2 text-slate-300">Сіздің жалпы нәтижеңіз <span className="font-semibold text-amber-200">{overallPercent}%</span> деңгейде. Қайта оқу керек: Кенесары қозғалысының себептері, шайқастардың хронологиясы, жер мәселесі мен ұлт-азаттық идеологиясы.</p></div><div className="flex flex-wrap gap-3"><button type="button" onClick={resetAllGames} className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-3 font-medium text-slate-900"><Printer size={18} /> Қайта бастау</button><button type="button" className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-950 px-5 py-3 font-medium text-white"><Printer size={18} /> Нәтижені басып шығару</button></div></div> : <div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-6 text-slate-300">Барлық ойын тапсырмалары толығымен аяқталғаннан кейін қорытынды нәтиже көрсетіледі.</div>}
+            <p className="mb-5 text-sm text-slate-300">Бұл беттегі жиынтық — браузер сессиясындағы ойын жаттығуларының нәтижесі. Сақталған, сервер тексерген тест ұпайы жеке кабинетте көрсетіледі.</p>
+            {allGamesDone ? <div className="space-y-5"><div className="grid gap-4 md:grid-cols-4"><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Жаттығу ұпайы</p><p className="mt-2 text-3xl font-bold text-white">{totalScore}</p></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Ең жоғары нәтиже</p><p className="mt-2 text-3xl font-bold text-white">{Math.max(...Object.values(gameResults).map((item) => item.score))}</p></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Дұрыс жауаптар</p><p className="mt-2 text-3xl font-bold text-white">{Object.values(gameResults).reduce((sum, item) => sum + item.correct, 0)}</p></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><p className="text-sm text-slate-400">Деңгей</p><p className="mt-2 text-3xl font-bold text-white">{finalLevel}</p></div></div><div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-5"><p className="text-lg font-semibold text-white">Білім деңгейі: {finalLevel}</p><p className="mt-2 text-slate-300">Сіздің ойын жаттығулары бойынша нәтижеңіз <span className="font-semibold text-amber-200">{overallPercent}%</span>. Қайта оқу керек: Кенесары қозғалысының себептері, шайқастардың хронологиясы, жер мәселесі мен ұлт-азаттық идеологиясы.</p></div><div className="flex flex-wrap gap-3"><button type="button" onClick={resetAllGames} className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-3 font-medium text-slate-900"><Printer size={18} /> Қайта бастау</button><button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-950 px-5 py-3 font-medium text-white"><Printer size={18} /> Нәтижені басып шығару</button></div></div> : <div className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-6 text-slate-300">Барлық ойын тапсырмалары толығымен аяқталғаннан кейін қорытынды нәтиже көрсетіледі.</div>}
           </section>
+          )}
+
+          {activePage === 'login' && <AuthPage initialMode="login" onNavigate={(page) => navigateTo(page)} />}
+          {activePage === 'register' && <AuthPage initialMode="register" onNavigate={(page) => navigateTo(page)} />}
+          {activePage === 'reset-password' && <AuthPage initialMode="reset" onNavigate={(page) => navigateTo(page)} />}
+          {activePage === 'profile' && (
+            authLoading
+              ? <section className="account-card"><p>Сессия тексерілуде…</p></section>
+              : session
+                ? <StudentDashboard key={session.user.id} onNavigate={(page) => navigateTo(page)} />
+                : <AuthPage initialMode="login" onNavigate={(page) => navigateTo(page)} />
+          )}
+          {activePage === 'admin' && (
+            authLoading
+              ? <section className="account-card"><p>Құқық тексерілуде…</p></section>
+              : !session
+                ? <AuthPage initialMode="login" onNavigate={(page) => navigateTo(page)} />
+                : profile?.role === 'admin'
+                  ? <AdminDashboard key={session.user.id} />
+                  : <section className="account-card"><p className="account-kicker">ҚОРҒАЛҒАН БӨЛІМ</p><h1>Қолжетімділік жоқ</h1><p>Бұл бетке тек дерекқорда әкімші рөлі тағайындалған пайдаланушы кіре алады.</p></section>
           )}
         </main>
         <footer className={`site-footer ${activePage === 'home' ? 'site-footer-home' : ''}`}>
@@ -887,4 +835,8 @@ function App() {
   )
 }
 
-export default App
+function AppWithAuth() {
+  return <AuthProvider><App /></AuthProvider>
+}
+
+export default AppWithAuth
