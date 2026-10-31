@@ -11,7 +11,6 @@ import {
   Play,
   Printer,
   Search,
-  Sparkles,
   SunMedium,
   Trophy,
   Users,
@@ -23,6 +22,7 @@ import HistoryTutor, { type ChatMessage } from './components/HistoryTutor'
 import { AdminDashboard, AuthPage, StudentDashboard } from './components/AccountPages'
 import { AuthProvider } from './components/AuthContext'
 import { useAuth } from './components/useAuth'
+import SurveyExperience from './components/SurveyExperience'
 import VerifiedQuiz from './components/VerifiedQuiz'
 
 type TimelineEvent = {
@@ -90,7 +90,7 @@ const navItems = [
   { id: 'timeline', label: 'Хронология' },
   { id: 'knowledge', label: 'Тарихи деректер' },
   { id: 'study', label: 'Оқу материалы' },
-  { id: 'games', label: 'Интерактивті ойын' },
+  { id: 'games', label: 'Сауалнама' },
   { id: 'library', label: 'Сөздік және AI тарихшы' },
   { id: 'result', label: 'Нәтиже' },
 ] as const
@@ -103,7 +103,7 @@ const primaryNav: { id: PageId; label: string }[] = [
   { id: 'timeline', label: 'Хронология' },
   { id: 'knowledge', label: 'Тұлғалар' },
   { id: 'knowledge', label: 'Деректер' },
-  { id: 'games', label: 'Ойындар' },
+  { id: 'games', label: 'Сауалнама' },
 ]
 
 const pageAliases: Record<string, PageId> = {
@@ -287,6 +287,7 @@ function App() {
   const [factIndex, setFactIndex] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeGame, setActiveGame] = useState(0)
+  const [showPracticeGames, setShowPracticeGames] = useState(false)
   const [matchingAnswers, setMatchingAnswers] = useState<Record<string, string>>({})
   const [matchingResult, setMatchingResult] = useState<{ correct: number; total: number; score: number } | null>(null)
   const [identitySelected, setIdentitySelected] = useState('')
@@ -371,15 +372,14 @@ function App() {
         { id: 'profile', label: 'Жеке кабинет' },
         ...(profile?.role === 'admin' ? [{ id: 'admin' as const, label: 'Әкімші панелі' }] : []),
       ]
-    : [
-        { id: 'login', label: 'Кіру' },
-        { id: 'register', label: 'Тіркелу' },
-      ]
+    : []
   const menuItems = [...navItems, ...accountMenuItems]
-  const desktopAccountItems: { id: PageId; label: string }[] = [
-    { id: session ? 'profile' : 'login', label: session ? 'Кабинет' : 'Кіру' },
-    ...(profile?.role === 'admin' ? [{ id: 'admin' as const, label: 'Әкімші' }] : []),
-  ]
+  const desktopAccountItems: { id: PageId; label: string }[] = session
+    ? [
+        { id: 'profile', label: 'Кабинет' },
+        ...(profile?.role === 'admin' ? [{ id: 'admin' as const, label: 'Әкімші' }] : []),
+      ]
+    : []
 
   const filteredGlossary = useMemo(() => {
     const value = searchTerm.trim().toLowerCase()
@@ -392,7 +392,6 @@ function App() {
   const overallPercent = doneGames === 0 ? 0 : Math.round(Object.values(gameResults).reduce((sum, item) => sum + item.percent, 0) / doneGames)
   const finalLevel = overallPercent >= 85 ? 'Үздік' : overallPercent >= 70 ? 'Жоғары' : overallPercent >= 45 ? 'Орташа' : 'Бастапқы'
   const allGamesDone = doneGames === gameTabs.length
-  const progressValue = (doneGames / gameTabs.length) * 100
 
   const cycleFact = () => setFactIndex((prev) => (prev + 1) % funFacts.length)
 
@@ -591,9 +590,9 @@ function App() {
             <nav className="desktop-nav" aria-label="Негізгі навигация">
               {primaryNav.map((item, index) => <button key={`${item.label}-${index}`} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</button>)}
             </nav>
-            <nav className="desktop-account-nav" aria-label="Аккаунт">
+            {desktopAccountItems.length > 0 && <nav className="desktop-account-nav" aria-label="Аккаунт">
               {desktopAccountItems.map((item) => <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</button>)}
-            </nav>
+            </nav>}
             <div className="header-actions">
               <button type="button" onClick={() => setDarkMode((prev) => !prev)} className="theme-toggle" aria-label="Түстер режимін ауыстыру">{darkMode ? <SunMedium size={17} /> : <Moon size={17} />}</button>
               <button type="button" onClick={() => setMenuOpen((prev) => !prev)} className={`menu-toggle ${menuOpen ? 'menu-toggle-open' : ''}`} aria-label={menuOpen ? 'Мәзірді жабу' : 'Мәзірді ашу'} aria-expanded={menuOpen}><span>{menuOpen ? 'Жабу' : 'Мәзір'}</span>{menuOpen ? <X size={19} /> : <Menu size={19} />}</button>
@@ -667,8 +666,8 @@ function App() {
           </section>
 
           <section className="final-challenge editorial-section">
-            <div><p className="eyebrow">КЕЛЕСІ ҚАДАМ</p><h2>Тарихты біл.<br /><em>Бағаңды көр.</em></h2><p>Тапсырмаларды орындап, жеке нәтижеңізді тексеріңіз.</p></div>
-            <div className="challenge-progress"><span className="challenge-progress-label">ОРЫНДАЛҒАН ОЙЫНДАР</span><strong>{doneGames}<i> / {gameTabs.length}</i></strong><div className="progress-rail"><span style={{ width: `${progressValue}%` }} /></div><button type="button" className="hero-primary-link" onClick={() => navigateTo('games')}>Сынақты бастау <ArrowRight size={17} /></button></div>
+            <div><p className="eyebrow">КЕЛЕСІ ҚАДАМ</p><h2>Пікіріңмен бөліс.<br /><em>Тарихты зертте.</em></h2><p>10 сұраққа жауап беріп, зерттеуге қатысыңыз. Сауалнаманың мақсаты — кемінде 100 нақты респондент жинау.</p></div>
+            <div className="challenge-progress"><span className="challenge-progress-label">САУАЛНАМА МАҚСАТЫ</span><strong>100<i>+ адам</i></strong><button type="button" className="hero-primary-link" onClick={() => navigateTo('games')}>Сауалнамаға өту <ArrowRight size={17} /></button></div>
           </section>
           </div>
           )}
@@ -777,12 +776,20 @@ function App() {
           </div>}
 
           {activePage === 'games' && (
-          <section id="games" className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
-            <div className="mb-6 flex items-center gap-3"><Sparkles className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Интерактивті ойын</p><h2 className="text-3xl font-bold text-white">Тарихты ойын арқылы үйрен</h2></div></div>
-            <p className="mb-5 max-w-3xl text-sm leading-6 text-slate-300">Тарихи викторинаның ұпайы серверде тексеріліп, профиліңізге сақталады. Қалған төрт шағын ойын — осы сессияға арналған жаттығулар; олардың ұпайы рейтингке қосылмайды.</p>
-            <div className="mb-5 flex flex-wrap gap-2">{gameTabs.map((game, index) => <button key={game.key} type="button" onClick={() => setActiveGame(index)} className={`rounded-full px-4 py-2 text-sm font-medium transition ${activeGame === index ? 'bg-amber-400 text-slate-900' : 'border border-slate-700 bg-slate-950 text-slate-200'}`}>{game.label}</button>)}</div>
-            <div className="rounded-[24px] border border-slate-700 bg-slate-950/60 p-5">{renderGamePanel()}</div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">{gameTabs.map((game) => { const result = gameResults[game.key]; return <div key={game.key} className="rounded-[18px] border border-slate-700 bg-slate-950/50 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">{game.label}</p><p className="mt-2 text-xl font-bold text-white">{result.score} {game.key === 'quiz' ? 'серверлік ұпай' : 'жаттығу ұпайы'}</p><p className="text-sm text-slate-300">{result.done ? 'Аяқталды' : 'Орындалмады'}</p></div>})}</div>
+          <section id="games" className="survey-page">
+            <SurveyExperience />
+            <div className="survey-practice-toggle">
+              <div><p className="survey-kicker">ҚОСЫМША БӨЛІМ</p><h2>Тарихи ойын жаттығулары</h2><p>Бұрынғы викторина мен төрт жаттығу осы жерде сақталған.</p></div>
+              <button type="button" className="survey-submit" aria-expanded={showPracticeGames} onClick={() => setShowPracticeGames((visible) => !visible)}>{showPracticeGames ? 'Жаттығуларды жасыру' : 'Жаттығуларды ашу'} <ArrowRight size={17} /></button>
+            </div>
+            {showPracticeGames && (
+              <div className="survey-practice-content">
+                <p className="survey-practice-note">Тарихи викторинаның ұпайы серверде тексеріліп, профиліңізге сақталады. Қалған төрт шағын ойын осы сессияға арналған жаттығулар; олардың ұпайы рейтингке қосылмайды.</p>
+                <div className="mb-5 flex flex-wrap gap-2">{gameTabs.map((game, index) => <button key={game.key} type="button" onClick={() => setActiveGame(index)} className={`rounded-full px-4 py-2 text-sm font-medium transition ${activeGame === index ? 'bg-amber-400 text-slate-900' : 'border border-slate-700 bg-slate-950 text-slate-200'}`}>{game.label}</button>)}</div>
+                <div className="rounded-[24px] border border-slate-700 bg-slate-950/60 p-5">{renderGamePanel()}</div>
+                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">{gameTabs.map((game) => { const result = gameResults[game.key]; return <div key={game.key} className="rounded-[18px] border border-slate-700 bg-slate-950/50 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">{game.label}</p><p className="mt-2 text-xl font-bold text-white">{result.score} {game.key === 'quiz' ? 'серверлік ұпай' : 'жаттығу ұпайы'}</p><p className="text-sm text-slate-300">{result.done ? 'Аяқталды' : 'Орындалмады'}</p></div>})}</div>
+              </div>
+            )}
           </section>
           )}
 

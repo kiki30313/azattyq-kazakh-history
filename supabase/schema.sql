@@ -477,3 +477,142 @@ values
   ('20000000-0000-4000-8000-000000000009', '10000000-0000-4000-8000-000000000001', 9, 'Кенесары көтерілісінің басты саяси мақсаты қандай болды?', '["Азаматтық және саяси дербестік","Тек өнеркәсіпті дамыту","Тек қала тұрғындарын қорғау","Әскери озаттық"]', 'Азаматтық және саяси дербестік', 'Көтеріліс жер, билік және ұлттық дербестік үшін өрбіді.'),
   ('20000000-0000-4000-8000-000000000010', '10000000-0000-4000-8000-000000000001', 10, 'Көтерілістің жеңілуіне ықпал еткен факторлардың бірі қандай?', '["Ресейдің әскери басымдығы","Ерекше табиғат","Тек шетелдік достар","Халықтың толық келісімі"]', 'Ресейдің әскери басымдығы', 'Ресейдің әскери, логистикалық және әкімшілік ресурстары көтерілісті басуға ықпал етті.')
 on conflict (id) do update set prompt = excluded.prompt, choices = excluded.choices, correct_answer = excluded.correct_answer, explanation = excluded.explanation;
+
+create table if not exists public.survey_questions (
+  id smallint primary key check (id between 1 and 10),
+  kind text not null check (kind in ('open', 'closed', 'multiple')),
+  prompt text not null,
+  options jsonb,
+  correct_answers jsonb,
+  check (options is null or jsonb_typeof(options) = 'array'),
+  check (correct_answers is null or jsonb_typeof(correct_answers) = 'array'),
+  check (
+    (kind = 'open' and options is null and correct_answers is null)
+    or (kind in ('closed', 'multiple') and jsonb_typeof(options) = 'array' and jsonb_array_length(options) >= 2)
+  )
+);
+
+create table if not exists public.survey_submissions (
+  id uuid primary key default gen_random_uuid(),
+  respondent_name text not null check (length(trim(respondent_name)) between 2 and 100),
+  answers jsonb not null check (jsonb_typeof(answers) = 'object'),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists survey_submissions_created_idx
+  on public.survey_submissions (created_at desc);
+
+alter table public.survey_questions enable row level security;
+alter table public.survey_submissions enable row level security;
+
+revoke all on public.survey_questions, public.survey_submissions
+  from public, anon, authenticated;
+grant all on public.survey_questions, public.survey_submissions to service_role;
+
+insert into public.survey_questions (id, kind, prompt, options, correct_answers)
+values
+  (1, 'open', 'Қазақстандағы ұлт-азаттық көтерілістер туралы оқығанда, сізді ең алдымен қандай сұрақ қызықтырады?', null, null),
+  (2, 'closed', 'Кенесары Қасымұлы бастаған көтеріліс 1837 жылы басталды ма?', '["Иә","Жоқ"]', '["Иә"]'),
+  (3, 'multiple', 'Кенесары Қасымұлы көтерілісіне қатысты дұрыс деректерді таңдаңыз.', '["Көтеріліс 1837–1847 жылдары болды","Кенесары 1841 жылы хан сайланды","1838 жылы Ақмола бекінісіне шабуыл жасалды","Көтеріліс 1783 жылы басталды"]', '["Көтеріліс 1837–1847 жылдары болды","Кенесары 1841 жылы хан сайланды","1838 жылы Ақмола бекінісіне шабуыл жасалды"]'),
+  (4, 'closed', 'Исатай Тайманұлы мен Махамбет Өтемісұлы бастаған қозғалыс 1836–1838 жылдары өтті ме?', '["Иә","Жоқ"]', '["Иә"]'),
+  (5, 'multiple', 'Сырым Датұлы көтерілісіне қатысты дұрыс сипаттамаларды таңдаңыз.', '["Көтеріліс 1783–1797 жылдары болды","Отарлық саясат пен жер мәселесіне қарсы бағытталды","Кіші жүз аумағын қамтыды","1916 жылғы көтерілістің жетекшісі болды"]', '["Көтеріліс 1783–1797 жылдары болды","Отарлық саясат пен жер мәселесіне қарсы бағытталды","Кіші жүз аумағын қамтыды"]'),
+  (6, 'open', 'Жер мәселесі мен отарлық әкімшілік өзгерістер халықтың өміріне қалай әсер етті деп ойлайсыз?', null, null),
+  (7, 'multiple', '1916 жылғы ұлт-азаттық көтеріліске қатысты дұрыс тұжырымдарды таңдаңыз.', '["25 маусым жарлығы бойынша тыл жұмысына адам алу наразылық туғызды","Жердің тартып алынуы мен отарлық қысым себептердің бірі болды","Торғай өңірінде көтеріліске Амангелді Иманов қатысты","Қозғалыс Кенесары хан тұсында өтті"]', '["25 маусым жарлығы бойынша тыл жұмысына адам алу наразылық туғызды","Жердің тартып алынуы мен отарлық қысым себептердің бірі болды","Торғай өңірінде көтеріліске Амангелді Иманов қатысты"]'),
+  (8, 'closed', 'Сырым Датұлы көтерілісі Кенесары Қасымұлы көтерілісінен бұрын болды ма?', '["Иә","Жоқ"]', '["Иә"]'),
+  (9, 'multiple', 'Төмендегі қай қозғалыстар Қазақстандағы ұлт-азаттық күрес тарихына жатады?', '["Сырым Датұлы көтерілісі (1783–1797)","Исатай мен Махамбет көтерілісі (1836–1838)","Кенесары Қасымұлы көтерілісі (1837–1847)","1916 жылғы ұлт-азаттық көтеріліс"]', '["Сырым Датұлы көтерілісі (1783–1797)","Исатай мен Махамбет көтерілісі (1836–1838)","Кенесары Қасымұлы көтерілісі (1837–1847)","1916 жылғы ұлт-азаттық көтеріліс"]'),
+  (10, 'open', 'Тарихи көтерілістерді жақсырақ түсіну үшін қандай материал немесе тақырып қосар едіңіз?', null, null)
+on conflict (id) do update
+set kind = excluded.kind,
+    prompt = excluded.prompt,
+    options = excluded.options,
+    correct_answers = excluded.correct_answers;
+
+create or replace function public.get_public_survey_results()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  total_responses integer;
+  question_row record;
+  response_count integer;
+  correct_count integer;
+  option_row record;
+  option_count integer;
+  option_results jsonb;
+  question_results jsonb := '[]'::jsonb;
+begin
+  select count(*) into total_responses from public.survey_submissions;
+
+  for question_row in
+    select id, kind, options, correct_answers
+    from public.survey_questions
+    order by id
+  loop
+    select count(*) into response_count
+    from public.survey_submissions
+    where answers ? question_row.id::text;
+
+    option_results := '[]'::jsonb;
+    if question_row.kind <> 'open' then
+      for option_row in
+        select value as label
+        from jsonb_array_elements_text(question_row.options)
+      loop
+        select count(*) into option_count
+        from public.survey_submissions as submission
+        cross join lateral jsonb_array_elements_text(
+          case jsonb_typeof(submission.answers -> question_row.id::text)
+            when 'array' then submission.answers -> question_row.id::text
+            when 'string' then jsonb_build_array(submission.answers ->> question_row.id::text)
+            else '[]'::jsonb
+          end
+        ) as selected(value)
+        where selected.value = option_row.label;
+
+        option_results := option_results || jsonb_build_array(
+          jsonb_build_object('label', option_row.label, 'count', option_count)
+        );
+      end loop;
+    end if;
+
+    correct_count := null;
+    if question_row.correct_answers is not null then
+      select count(*) into correct_count
+      from public.survey_submissions as submission
+      where (
+        select coalesce(array_agg(selected.value order by selected.value), array[]::text[])
+        from jsonb_array_elements_text(
+          case jsonb_typeof(submission.answers -> question_row.id::text)
+            when 'array' then submission.answers -> question_row.id::text
+            when 'string' then jsonb_build_array(submission.answers ->> question_row.id::text)
+            else '[]'::jsonb
+          end
+        ) as selected(value)
+      ) = (
+        select coalesce(array_agg(correct.value order by correct.value), array[]::text[])
+        from jsonb_array_elements_text(question_row.correct_answers) as correct(value)
+      );
+    end if;
+
+    question_results := question_results || jsonb_build_array(
+      jsonb_build_object(
+        'id', question_row.id,
+        'responseCount', response_count,
+        'correctCount', correct_count,
+        'options', option_results
+      )
+    );
+  end loop;
+
+  return jsonb_build_object(
+    'respondentCount', total_responses,
+    'questions', question_results
+  );
+end;
+$$;
+
+revoke all on function public.get_public_survey_results() from public;
+grant execute on function public.get_public_survey_results() to anon, authenticated;

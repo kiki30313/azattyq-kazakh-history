@@ -12,6 +12,9 @@
   "functions": {
     "api/chat.ts": {
       "maxDuration": 35
+    },
+    "api/survey.ts": {
+      "maxDuration": 10
     }
   },
   "headers": [

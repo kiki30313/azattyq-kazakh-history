@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ArrowRight, LogOut, Search, ShieldCheck, UserRound, Users } from 'lucide-react'
 import { useAuth } from './useAuth'
 import { supabase, supabaseConfigured } from '../lib/supabase'
+import { surveyApiUrl } from '../lib/surveyApi'
+import { surveyQuestions, type SurveyAnswer } from '../../shared/survey'
 
 type AuthMode = 'login' | 'register' | 'forgot' | 'reset'
 type StudentRow = {
@@ -39,6 +41,26 @@ type AdminDetail = {
   profile: StudentRow
   attempts: AttemptRow[]
   adjustments: AdjustmentRow[]
+}
+type SurveySubmission = {
+  id: string
+  respondent_name: string
+  answers: Record<string, SurveyAnswer>
+  created_at: string
+}
+type AdminSurveyResponses = {
+  responses: SurveySubmission[]
+  totalCount: number
+  hasMore: boolean
+}
+
+async function fetchAdminSurveyResponses(accessToken: string, offset: number): Promise<AdminSurveyResponses> {
+  const response = await fetch(`${surveyApiUrl}?view=responses&offset=${offset}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+  })
+  const data = await response.json() as AdminSurveyResponses & { error?: string }
+  if (!response.ok) throw new Error(data.error || 'Сауалнама жауаптарын жүктеу мүмкін болмады.')
+  return data
 }
 
 const cardClass = 'account-card'
@@ -178,7 +200,7 @@ export function StudentDashboard({ onNavigate }: { onNavigate: (page: 'games' | 
         <article><span>Тест әрекеті</span><strong>{attempts.length}</strong></article>
         <article><span>Орташа нәтиже</span><strong>{average}%</strong></article>
       </div>
-      <div className="account-section-heading"><h2>Тест тапсыру тарихы</h2><button type="button" className="account-text-link" onClick={() => onNavigate('games')}>Тестке өту <ArrowRight size={15} /></button></div>
+      <div className="account-section-heading"><h2>Тест тапсыру тарихы</h2><button type="button" className="account-text-link" onClick={() => onNavigate('games')}>Сауалнама мен тест бөліміне өту <ArrowRight size={15} /></button></div>
       {attempts.length === 0 ? <p className="account-empty">Әзірге аяқталған тест жоқ. Тарихи викторинаны бастап, алғашқы нәтижені сақтаңыз.</p> : (
         <div className="account-table-wrap"><table className="account-table"><thead><tr><th>Тест</th><th>Күні</th><th>Ұпай</th><th>Дұрыс</th></tr></thead><tbody>{attempts.map((attempt) => <tr key={attempt.id}><td>{attempt.assessment_title}</td><td>{new Date(attempt.created_at).toLocaleDateString('kk-KZ')}</td><td>{attempt.score}/{attempt.max_score}</td><td>{attempt.question_count ? Math.round(attempt.correct_count / attempt.question_count * 100) : 0}%</td></tr>)}</tbody></table></div>
       )}
@@ -190,6 +212,11 @@ export function AdminDashboard() {
   const { session } = useAuth()
   const [search, setSearch] = useState('')
   const [students, setStudents] = useState<StudentRow[]>([])
+  const [surveyResponses, setSurveyResponses] = useState<SurveySubmission[]>([])
+  const [surveyResponseCount, setSurveyResponseCount] = useState(0)
+  const [hasMoreSurveyResponses, setHasMoreSurveyResponses] = useState(false)
+  const [isLoadingSurveyResponses, setIsLoadingSurveyResponses] = useState(true)
+  const [surveyResponseError, setSurveyResponseError] = useState('')
   const [selected, setSelected] = useState<AdminDetail | null>(null)
   const [reason, setReason] = useState('')
   const [comment, setComment] = useState('')
@@ -228,6 +255,48 @@ export function AdminDashboard() {
     void loadInitialStudents()
     return () => { active = false }
   }, [session])
+
+  useEffect(() => {
+    if (!session) return
+    let active = true
+    void fetchAdminSurveyResponses(session.access_token, 0)
+      .then((data) => {
+        if (!active) return
+        setSurveyResponses(data.responses)
+        setSurveyResponseCount(data.totalCount)
+        setHasMoreSurveyResponses(data.hasMore)
+        setSurveyResponseError('')
+      })
+      .catch((requestError: unknown) => {
+        if (active) {
+          setSurveyResponseError(requestError instanceof Error
+            ? requestError.message
+            : 'Сауалнама жауаптарын жүктеу мүмкін болмады.')
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoadingSurveyResponses(false)
+      })
+    return () => { active = false }
+  }, [session])
+
+  const loadMoreSurveyResponses = async () => {
+    if (!session || isLoadingSurveyResponses) return
+    setIsLoadingSurveyResponses(true)
+    setSurveyResponseError('')
+    try {
+      const data = await fetchAdminSurveyResponses(session.access_token, surveyResponses.length)
+      setSurveyResponses((previous) => [...previous, ...data.responses])
+      setSurveyResponseCount(data.totalCount)
+      setHasMoreSurveyResponses(data.hasMore)
+    } catch (requestError) {
+      setSurveyResponseError(requestError instanceof Error
+        ? requestError.message
+        : 'Сауалнама жауаптарын жүктеу мүмкін болмады.')
+    } finally {
+      setIsLoadingSurveyResponses(false)
+    }
+  }
 
   const loadStudent = async (studentId: string) => {
     if (!supabase) return
@@ -284,6 +353,40 @@ export function AdminDashboard() {
       <div className="account-heading"><div><h1>Студенттер</h1><p>Рөл және балл операциялары дерекқорда тексеріледі.</p></div><strong className="account-count"><Users size={16} /> {students.length}</strong></div>
       {error && <AccountMessage>{error}</AccountMessage>}
       {notice && <p className="account-success" role="status">{notice}</p>}
+      <section className="admin-survey-responses">
+        <div className="account-section-heading">
+          <div><h2>Сауалнама жауаптары</h2><p>Қатысушының аты және барлық жауаптары әкімшіге ғана көрсетіледі.</p></div>
+          <strong className="account-count">{surveyResponseCount} жауап</strong>
+        </div>
+        {surveyResponseError && <AccountMessage>{surveyResponseError}</AccountMessage>}
+        {isLoadingSurveyResponses && surveyResponses.length === 0
+          ? <p className="account-empty">Жауаптар жүктелуде…</p>
+          : surveyResponses.length === 0
+            ? <p className="account-empty">Әзірге сауалнама жауабы жоқ.</p>
+            : <div className="admin-survey-response-list">{surveyResponses.map((submission) => (
+              <details className="admin-survey-response" key={submission.id}>
+                <summary>
+                  <strong>{submission.respondent_name}</strong>
+                  <span>{new Date(submission.created_at).toLocaleString('kk-KZ')}</span>
+                </summary>
+                <dl>
+                  {surveyQuestions.map((question) => {
+                    const answer = submission.answers[String(question.id)]
+                    const answerText = Array.isArray(answer) ? answer.join(' · ') : answer
+                    return (
+                      <div className="admin-survey-answer" key={question.id}>
+                        <dt>{question.id}. {question.prompt}</dt>
+                        <dd className={question.type === 'open' ? 'is-open-answer' : ''}>
+                          {answerText || 'Жауап берілмеген'}
+                        </dd>
+                      </div>
+                    )
+                  })}
+                </dl>
+              </details>
+            ))}</div>}
+        {hasMoreSurveyResponses && <button type="button" className="account-secondary admin-survey-load-more" onClick={() => void loadMoreSurveyResponses()} disabled={isLoadingSurveyResponses}>{isLoadingSurveyResponses ? 'Жүктелуде…' : 'Тағы жауап жүктеу'}</button>}
+      </section>
       <form className="account-search" onSubmit={(event) => void searchStudents(event)}><Search size={17} /><input className={controlClass} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Аты немесе email арқылы іздеу" /><button type="submit" className="account-secondary" disabled={isLoading}>{isLoading ? 'Іздеу…' : 'Іздеу'}</button></form>
       <div className="admin-student-list">{students.map((student) => <button type="button" className={`admin-student-row ${selected?.profile.id === student.id ? 'is-selected' : ''}`} onClick={() => void loadStudent(student.id)} key={student.id}><UserRound size={18} /><span><strong>{student.display_name}</strong><small>{student.email}</small></span><span className="admin-student-metrics">{student.total_points} ұпай · {student.attempt_count} тест</span></button>)}</div>
       {selected && <div className="admin-detail">
