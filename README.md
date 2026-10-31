@@ -18,6 +18,10 @@ GEMINI_API_KEY=ваш-серверный-ключ
 GEMINI_MODEL=gemini-3.1-flash-lite
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 VITE_API_BASE_URL=
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 ```
 
 Для локальной работы и frontend, и API запустите Vercel Dev:
@@ -43,6 +47,8 @@ npm run lint
 | `GEMINI_MODEL` | Vercel / локальный `.env.local` | Имя модели Gemini. Рекомендуемое значение: `gemini-3.1-flash-lite`. Если не задано, backend использует это значение по умолчанию. |
 | `ALLOWED_ORIGINS` | Vercel / локальный `.env.local` | Разрешённые origin через запятую, без путей: `https://username.github.io`. |
 | `VITE_API_BASE_URL` | GitHub Actions Repository Variable либо локальная frontend-сборка | Публичный URL backend, например `https://your-project.vercel.app`; это не секрет. Пустое значение использует текущий origin и подходит для Vercel Dev. |
+| `SUPABASE_URL` | Только Vercel / локальный `.env.local` | Project URL для serverless API сауалнамасы. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Только Vercel / локальный `.env.local` | Құпия серверлік кілт: сауалнама жауабын сақтайды, бірақ браузерге жіберілмейді. Оны ешқашан `VITE_*` деп атамаңыз. |
 
 Настройте точный `ALLOWED_ORIGINS` для GitHub Pages в Vercel. Для URL вида `https://username.github.io/project/` origin — `https://username.github.io` (без `/project/`). CORS не является аутентификацией и сам по себе не защищает endpoint от прямых запросов.
 
@@ -82,6 +88,63 @@ Vite использует относительный `base: './'`, подход�
 ```json
 { "answer": "..." }
 ```
+
+## Сауалнама нәтижелерін сақтау
+
+Сауалнамаға қатысу үшін аккаунт құру немесе жүйеге кіру керек емес. Қатысушы аты мен 10 жауап Vercel `POST /api/survey` endpoint-і арқылы Supabase-ке сақталады. Қоғамдық API тек агрегатталған статистиканы қайтарады; қатысушылардың аты мен толық жауаптарын тек сервер тексерген әкімші көре алады. Әкімші панеліндегі «Сауалнама жауаптары» бөлімінде жауап берушінің аты, уақыты және барлық сұраққа жауабы, соның ішінде ашық мәтін өзгеріссіз көрсетіледі.
+
+1. Supabase жобасында SQL Editor арқылы [`supabase/schema.sql`](./supabase/schema.sql) файлын орындаңыз. Егер алдыңғы аккаунт/тест кестелері бұрыннан орнатылған болса, осы SQL файлын қайта орындау сауалнама кестелерін, сұрақтарды және жиынтық нәтиже RPC-сын қосады; бар сауалнама жауаптары өшірілмейді.
+2. Vercel **Project → Settings → Environment Variables** ішіне `SUPABASE_URL` және `SUPABASE_SERVICE_ROLE_KEY` айнымалыларын **Production** және қолданылатын **Preview** орталарына қосыңыз. Service role кілтін тек Supabase Dashboard-тан алыңыз; оны frontend, GitHub Actions Variables немесе `VITE_*` айнымалысына ешқашан қоспаңыз.
+3. Vercel-де `ALLOWED_ORIGINS` тізімінде жарияланған сайттың нақты origin-і болсын. GitHub Pages пайдаланылса, `VITE_API_BASE_URL` сол Vercel жобасының URL-іне бағытталуы керек.
+4. Өзгерістерді Vercel-ге жариялаған соң сауалнаманы аты-жөнді және 10 жауапты енгізіп жіберіп тексеріңіз. Сәтті жауаптан кейін қатысушылар саны көбейіп, пайыздар сақталған жауаптардан қайта есептеледі.
+
+Аттар дерекқорда құпия сақталады, статистика RPC-і тек жиынтық сандарды қайтарады. Serverless ішіндегі rate limit best-effort қана; ол тұрақты ортақ лимитерді алмастырмайды және CORS өздігінен злоупотреблениеден қорғамайды.
+
+## Аккаунты, тестовые баллы и администрирование Supabase
+
+### 1. Создание проекта и применение схемы
+
+1. Создайте проект в [Supabase Dashboard](https://supabase.com/dashboard).
+2. Откройте **SQL Editor → New query**, скопируйте содержимое [`supabase/schema.sql`](./supabase/schema.sql) и выполните один раз. Миграция создаёт профиль со студенческой ролью при регистрации, тест и вопросы, таблицы попыток и журнал балльных корректировок, RLS и защищённые RPC-функции.
+3. В **Authentication → Providers → Email** включите Email provider и подтверждение адреса. Настройте SMTP, если нужны надёжные production-письма.
+4. В **Authentication → URL Configuration** задайте Site URL `https://azattyq-kazakh-history.vercel.app` и добавьте разрешённые Redirect URLs для production и локальной разработки, включая `https://azattyq-kazakh-history.vercel.app/**` и `http://localhost:5173/**`. Если используется GitHub Pages, также добавьте точный URL страницы и путь проекта.
+
+### 2. Переменные окружения
+
+В **Vercel → Project → Settings → Environment Variables** добавьте публичные настройки для **Production**, а также **Preview**, если тестируете preview-деплои:
+
+| Переменная | Значение |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Project URL из **Supabase → Project Settings → API** |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable key из того же раздела (старый anon key также публичный, но предпочтителен publishable key) |
+
+Те же два значения добавьте в **GitHub → Settings → Secrets and variables → Actions → Variables** с такими же именами, чтобы GitHub Pages workflow мог собрать frontend. Эти значения рассчитаны на клиентское использование; безопасность данных обеспечивается RLS. **Не используйте и не публикуйте `service_role`/secret key.** Service role нужен только serverless endpoint сауалнамасы и остаётся исключительно в серверных переменных Vercel.
+
+Для локальной разработки скопируйте `.env.example` в `.env.local`, задайте Supabase Project URL и publishable key; для отправки сауалнама жауаптарын тексеру үшін серверге арналған `SUPABASE_URL` және `SUPABASE_SERVICE_ROLE_KEY` мәндерін де сол жерге енгізіңіз. `.env.local` игнорируется Git. Запускайте API через `npx vercel dev`, а не через один `npm run dev`.
+
+### 3. Первый администратор
+
+1. Зарегистрируйте аккаунт через сайт и подтвердите email.
+2. В Supabase **SQL Editor** выполните запрос, подставив свой точный email:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = lower('your-admin@example.com');
+```
+
+Убедитесь, что обновлена ровно одна строка. Это действие выполняется только из защищённого Dashboard/SQL Editor. Публичной регистрации администраторов нет; регистрационные metadata не используются для назначения роли. После изменения роли выйдите и войдите в аккаунт заново.
+
+### 4. Проверка
+
+- Зарегистрируйте отдельный студенческий тестовый аккаунт, подтвердите email и войдите.
+- Пройдите **Тарихи викторина** на странице игр. Балл вычисляет `submit_assessment` в Postgres из сохранённых сервером правильных ответов, а попытка привязывается к `auth.uid()`. Повторная отправка того же UUID попытки идемпотентна; новая попытка получает новый UUID.
+- Для защиты от повторного набора баллов на один аккаунт разрешена одна сохранённая попытка на каждый тест. Повторный submit или повторное прохождение не создаёт новую начисляемую запись.
+- Откройте личный кабинет и проверьте сохранённый результат. Попытки студент может только читать; вставка, изменение/удаление оценок и изменение роли не разрешены политиками/правами таблиц.
+- Остальные четыре интерактивных мини-игры остаются учебными упражнениями в браузере. Их локальные показатели не сохраняются и не добавляются к баллам профиля.
+- С аккаунта студента откройте `/#admin` — панель должна отказать в доступе. С аккаунта, которому роль назначена SQL-командой, проверьте поиск, историю, журнал и корректировку баллов с обязательной причиной.
+
+Маршруты `/login`, `/register`, `/profile` и `/admin` обслуживаются Vercel rewrite; на GitHub Pages используйте hash-маршруты `/#login`, `/#register`, `/#profile` и `/#admin`. Вкладка **Admin** защищена не только интерфейсом: каждый административный RPC повторно проверяет роль из `profiles`, а чтение таблиц ограничено RLS. Тестовые ответы не выдаются RPC для списка вопросов. Не считайте проверки в браузере границей безопасности.
 
 ## Исторические изображения
 
