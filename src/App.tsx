@@ -703,7 +703,7 @@ function App() {
           {activePage === 'map' && (
           <section id="map" className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
             <div className="mb-6 flex items-center gap-3"><MapPinned className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Тарихи карта</p><h2 className="text-3xl font-bold text-white">Көтерілістердің негізгі аймақтары</h2><p className="mt-2 text-sm text-slate-400">1836–1847 жылдардағы қозғалыстар мен Кенесары жасағының жорықтары</p></div></div>
-            <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="historical-map-layout grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
               <div>
                 <Suspense fallback={<div className="history-map-frame"><div className="historical-leaflet-map grid place-items-center text-sm text-slate-600">Карта жүктелуде…</div></div>}>
                   <HistoricalMap locations={mapLocations} selectedLocation={selectedMap} onSelectLocation={setSelectedMap} />
@@ -711,19 +711,19 @@ function App() {
                 <p className="history-map-note">Карта OpenStreetMap деректеріне негізделген және қазіргі географияны көрсетеді, тарихи шекараларды немесе нақты жорық жолын емес. Кең өңірлерге қойылған белгілер — бағдарлық нүктелер. Оқиғалар: <a href="https://e-history.kz/ru/history-of-kazakhstan/show/9190" target="_blank" rel="noreferrer">E-history.kz: Кенесары Қасымов көтерілісі</a>.</p>
               </div>
               <div className="flex flex-col gap-4">
-                <div className="rounded-[24px] border border-slate-700 bg-slate-950/50 p-4">
+                <div className="map-location-selector rounded-[24px] border border-slate-700 bg-slate-950/50 p-4">
                   <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-400">Картадан өңірді таңдаңыз</p>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                     {mapLocations.map((item, index) => <button key={item.name} type="button" onClick={() => setSelectedMap(item)} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${selectedMap.name === item.name ? 'border-amber-400/60 bg-amber-400/10 text-amber-100' : 'border-slate-700/80 bg-slate-900/50 text-slate-300 hover:border-slate-500'}`} aria-pressed={selectedMap.name === item.name}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${selectedMap.name === item.name ? 'bg-amber-300 text-slate-950' : 'bg-slate-800 text-amber-200'}`}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.name}</span><span className="text-xs text-slate-400">{item.period}</span></span></button>)}
                   </div>
                 </div>
-                <div className="rounded-[24px] border border-amber-400/20 bg-slate-950/60 p-5">
-                  <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Таңдалған өңір · {mapLocations.findIndex((item) => item.name === selectedMap.name) + 1}</p>
-                  <h3 className="mt-3 text-2xl font-bold text-white">{selectedMap.name}</h3>
-                  <div className="mt-3 inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-200">{selectedMap.period}</div>
-                  <p className="mt-5 leading-7 text-slate-200">{selectedMap.description}</p>
-                  <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-900/60 p-4"><p className="text-sm uppercase tracking-[0.2em] text-slate-400">Қозғалыс жетекшілері</p><p className="mt-2 text-slate-100">{selectedMap.people}</p></div>
-                </div>
+              </div>
+              <div className="rounded-[24px] border border-amber-400/20 bg-slate-950/60 p-5 lg:col-span-2">
+                <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Таңдалған өңір · {mapLocations.findIndex((item) => item.name === selectedMap.name) + 1}</p>
+                <h3 className="mt-3 text-2xl font-bold text-white">{selectedMap.name}</h3>
+                <div className="mt-3 inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-200">{selectedMap.period}</div>
+                <p className="mt-5 leading-7 text-slate-200">{selectedMap.description}</p>
+                <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-900/60 p-4"><p className="text-sm uppercase tracking-[0.2em] text-slate-400">Қозғалыс жетекшілері</p><p className="mt-2 text-slate-100">{selectedMap.people}</p></div>
               </div>
             </div>
           </section>

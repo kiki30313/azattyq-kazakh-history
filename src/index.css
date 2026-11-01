@@ -1481,6 +1481,24 @@ img {
   background: #d7d1c5;
 }
 
+@media (min-width: 1024px) {
+  .historical-map-layout .history-map-frame,
+  .historical-map-layout .map-location-selector {
+    box-sizing: border-box;
+    height: min(calc(65vh + 26px), 616px);
+    min-height: 456px;
+  }
+
+  .historical-map-layout .historical-leaflet-map {
+    height: calc(100% - 26px);
+    min-height: 0;
+  }
+
+  .historical-map-layout .map-location-selector {
+    overflow-y: auto;
+  }
+}
+
 .historical-map-marker-icon {
   border: 0;
   background: transparent;
