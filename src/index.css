@@ -103,7 +103,7 @@ img {
 
 .header-over-hero {
   border-bottom: 1px solid rgba(239, 227, 207, 0.2);
-  background: linear-gradient(180deg, rgba(23, 20, 16, 0.52), rgba(23, 20, 16, 0));
+  background: linear-gradient(180deg, rgba(54, 35, 22, 0.72), rgba(54, 35, 22, 0));
 }
 
 .header-solid {
@@ -407,29 +407,20 @@ img {
   min-height: 90svh;
   overflow: hidden;
   align-items: center;
-  background: #28231c;
+  background: #4e392a;
   color: #f4eee4;
 }
 
-.hero-art,
-.hero-shade {
+.hero-scene::before {
   position: absolute;
+  z-index: 0;
   inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.hero-art {
-  object-fit: cover;
-  object-position: center 48%;
-  transform: scale(1.06);
-  will-change: transform;
-}
-
-.hero-shade {
   background:
-    linear-gradient(90deg, rgba(22, 19, 15, 0.86) 0%, rgba(22, 19, 15, 0.63) 33%, rgba(22, 19, 15, 0.12) 72%, rgba(22, 19, 15, 0.16) 100%),
-    linear-gradient(0deg, rgba(19, 17, 14, 0.64), transparent 34%, rgba(19, 17, 14, 0.2));
+    linear-gradient(90deg, rgba(48, 31, 21, 0.78), rgba(48, 31, 21, 0.38) 58%, rgba(48, 31, 21, 0.22)),
+    linear-gradient(0deg, rgba(48, 31, 21, 0.38), transparent 50%, rgba(48, 31, 21, 0.18)),
+    url('/images/HomePage.jpg') center 46% / cover no-repeat;
+  content: '';
+  animation: hero-image-reveal 1200ms ease-out both;
 }
 
 .hero-meta {
@@ -572,6 +563,7 @@ img {
 
 .hero-period {
   position: absolute;
+  z-index: 1;
   right: clamp(30px, 7vw, 120px);
   bottom: 68px;
   display: flex;
@@ -582,8 +574,7 @@ img {
   animation: hero-rise 800ms 580ms both;
 }
 
-.hero-period span,
-.hero-art-credit {
+.hero-period span {
   font-size: 8px;
   letter-spacing: 0.17em;
 }
@@ -602,6 +593,7 @@ img {
 
 .hero-scroll {
   position: absolute;
+  z-index: 1;
   bottom: 24px;
   left: 33px;
   display: flex;
@@ -630,13 +622,6 @@ img {
   background: #f1d5ad;
   content: '';
   animation: scroll-indicator 1.8s ease-in-out infinite;
-}
-
-.hero-art-credit {
-  position: absolute;
-  right: 32px;
-  bottom: 27px;
-  color: rgba(245, 234, 217, 0.53);
 }
 
 .editorial-section {
@@ -779,8 +764,7 @@ img {
   height: 100%;
   min-height: 300px;
   object-fit: cover;
-  object-position: 58% 60%;
-  filter: saturate(0.66) sepia(0.17);
+  object-position: center;
 }
 
 .intro-figure figcaption {
@@ -873,25 +857,36 @@ img {
   aspect-ratio: 0.86;
   overflow: hidden;
   background-color: #6c5a44;
-  background-position: center;
-  background-size: cover;
+  background: #6c5a44;
   filter: saturate(0.7) sepia(0.12);
   transition: filter 300ms ease;
 }
 
+.era-image > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
 .era-card-2 .era-image {
   aspect-ratio: 0.96;
-  background-position: 30% center;
 }
 
 .era-card-3 .era-image {
   aspect-ratio: 0.8;
-  background-position: 65% center;
 }
 
 .era-card-4 .era-image {
   aspect-ratio: 1.02;
-  background-position: 85% center;
+}
+
+.era-card-2 .era-image > img { object-position: 38% center; }
+.era-card-3 .era-image > img { object-position: 50% 35%; }
+.era-card-4 .era-image > img { object-position: center 25%; }
+
+.era-card-1 .era-image > img {
+  filter: sepia(.35) brightness(.74);
 }
 
 .era-image::after {
@@ -920,10 +915,33 @@ img {
 }
 
 .era-image-label {
-  right: 12px;
+  right: 10px;
+  left: 10px;
   bottom: 12px;
-  font-size: 7px;
-  letter-spacing: 0.17em;
+  font-size: 6px;
+  letter-spacing: 0.1em;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.image-credit-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.image-credit-list a,
+.portrait-source {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.6;
+  text-decoration: underline;
+  text-decoration-color: rgba(163, 76, 50, 0.42);
+  text-underline-offset: 3px;
 }
 
 .era-date {
@@ -980,8 +998,16 @@ img {
   position: relative;
   min-height: 420px;
   background-color: #5a4938;
-  background-position: 55% center;
-  background-size: cover;
+  overflow: hidden;
+}
+
+.kenesary-image > img {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  object-position: center 38%;
 }
 
 .kenesary-image::after {
@@ -1147,6 +1173,42 @@ img {
   transform: scale(.93) rotate(4deg);
 }
 
+.person-portrait {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: clamp(220px, 29vw, 390px);
+  overflow: hidden;
+  background: #554331;
+}
+
+.person-portrait > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(.72) sepia(.1);
+}
+
+.person-portrait::after {
+  position: absolute;
+  inset: 45% 0 0;
+  background: linear-gradient(transparent, rgba(31, 24, 18, .72));
+  content: '';
+}
+
+.person-portrait > span {
+  position: absolute;
+  z-index: 1;
+  right: 10px;
+  bottom: 9px;
+  left: 10px;
+  color: #f3eadd;
+  font-size: 6px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  line-height: 1.5;
+}
+
 .portrait-disclaimer {
   margin: 9px 0 5px;
   color: var(--muted);
@@ -1190,6 +1252,16 @@ img {
 
 .person-archive-card .portrait-etching {
   height: clamp(210px, 23vw, 320px);
+}
+
+.person-archive-card .person-portrait {
+  height: clamp(210px, 23vw, 320px);
+}
+
+.person-archive-card .portrait-source {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 7px;
 }
 
 .person-archive-card h3 {
@@ -2034,6 +2106,11 @@ img {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes hero-image-reveal {
+  from { opacity: 0.35; transform: scale(1.035); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @keyframes menu-reveal {
   from { opacity: 0; clip-path: inset(0 0 100% 0); }
   to { opacity: 1; clip-path: inset(0 0 0 0); }
@@ -2134,8 +2211,6 @@ img {
   .quiz-controls { align-items: stretch; flex-direction: column-reverse; }
   .quiz-controls > button { width: 100%; }
   .hero-scene { min-height: 89svh; min-height: max(690px, 89svh); align-items: flex-end; }
-  .hero-art { object-position: center center; }
-  .hero-shade { background: linear-gradient(0deg, rgba(22,19,15,.91) 1%, rgba(22,19,15,.71) 43%, rgba(22,19,15,.08) 100%), linear-gradient(90deg, rgba(22,19,15,.2), transparent); }
   .hero-meta { top: 84px; right: 16px; left: 16px; font-size: 7px; letter-spacing: .13em; }
   .hero-copy { width: calc(100% - 42px); margin: 0 0 120px 22px; }
   .hero-copy h1 { margin-left: -4px; font-size: clamp(64px, 18vw, 92px); letter-spacing: -0.06em; }
@@ -2145,7 +2220,6 @@ img {
   .hero-period strong { font-size: 26px; }
   .hero-period span { font-size: 6px; }
   .hero-scroll { bottom: 24px; left: 18px; font-size: 7px; }
-  .hero-art-credit { right: 16px; bottom: 12px; font-size: 6px; }
   .editorial-section { width: calc(100% - 38px); }
   .story-intro { grid-template-columns: 26px 1fr; gap: 14px; padding: 76px 0 72px; }
   .section-index { font-size: 21px; }
@@ -2202,7 +2276,8 @@ img {
   .people-archive-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 15px; }
   .person-archive-card:nth-child(n) { margin-top: 0; }
   .person-archive-card:nth-child(even) { margin-top: 34px; }
-  .person-archive-card .portrait-etching { height: 205px; }
+  .person-archive-card .portrait-etching,
+  .person-archive-card .person-portrait { height: 205px; }
   .person-archive-card h3 { font-size: 22px; }
   .portrait-disclaimer { font-size: 6px; }
 }
