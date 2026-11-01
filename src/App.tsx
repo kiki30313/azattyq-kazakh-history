@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   BookOpenText,
@@ -22,20 +22,14 @@ import { AuthProvider } from './components/AuthContext'
 import { useAuth } from './components/useAuth'
 import SurveyExperience from './components/SurveyExperience'
 import VerifiedQuiz from './components/VerifiedQuiz'
+import type { MapLocation } from './components/HistoricalMap'
+
+const HistoricalMap = lazy(() => import('./components/HistoricalMap'))
 
 type TimelineEvent = {
   year: string
   title: string
   description: string
-}
-
-type MapLocation = {
-  name: string
-  period: string
-  description: string
-  people: string
-  left: string
-  top: string
 }
 
 type Thesis = {
@@ -144,12 +138,15 @@ const timelineData: TimelineEvent[] = [
 ]
 
 const mapLocations: MapLocation[] = [
-  { name: 'Бөкей Ордасы мен Жайық маңы', period: '1836–1838', description: 'Исатай Тайманұлы мен Махамбет Өтемісұлы бастаған көтерілістің негізгі ошақтары осы өңірде болды.', people: 'Исатай Тайманұлы, Махамбет Өтемісұлы', left: '25%', top: '53%' },
-  { name: 'Көкшетау өңірі', period: '1837–1840', description: 'Кенесары қозғалысының алғашқы кезеңінде хан жасағы белсенді әрекет еткен өңірлердің бірі.', people: 'Кенесары Қасымұлы, Наурызбай батыр', left: '57%', top: '34%' },
-  { name: 'Ақмола бекінісі', period: '1838', description: '1838 жылы Кенесары жасағы Ақмола бекінісіне шабуыл жасады. Бекініс қазіргі Астана қаласының орнында орналасқан.', people: 'Кенесары Қасымұлы, Наурызбай батыр', left: '60%', top: '44%' },
-  { name: 'Торғай даласы', period: '1838–1845', description: 'Кенесары қозғалысы кең жайылған кезеңде Торғай даласы маңызды қоныс және әскери әрекет аймағына айналды.', people: 'Кенесары Қасымұлы, Ағыбай батыр', left: '45%', top: '55%' },
-  { name: 'Ұлытау өңірі', period: '1838–1840', description: 'Сарыарқаның орталық бөлігіндегі Ұлытау өңірі көтерілісшілердің маңызды тірек аймақтарының бірі болды.', people: 'Кенесары Қасымұлы, Ағыбай батыр', left: '51%', top: '65%' },
-  { name: 'Шу өңірі', period: '1846–1847', description: 'Кенесары жасағы оңтүстікке қарай жылжыды. 1847 жылғы соңғы жорық қазіргі Қырғызстан аумағында аяқталды.', people: 'Кенесары Қасымұлы, Наурызбай батыр', left: '69%', top: '73%' },
+  { name: 'Бөкей Ордасындағы көтеріліс аймағы', period: '1836–1838', description: 'Исатай Тайманұлы мен Махамбет Өтемісұлы бастаған қозғалыс Бөкей Ордасында басталып, кейін Жайықтың шығыс жағына тарады. Белгі кең аймақты бағдар ретінде көрсетеді.', people: 'Исатай Тайманұлы, Махамбет Өтемісұлы', position: [48.8, 49.2], zoom: 6 },
+  { name: 'Ақмола бекінісі', period: '1838', description: 'E-history.kz дерегінде Кенесары жасағының Ақмола бекінісін 1838 жылдың көктемінде қоршағаны және өртегені жазылған. Бекініс қазіргі Астана орнында болған.', people: 'Кенесары Қасымұлы', position: [51.1694, 71.4491], zoom: 9 },
+  { name: 'Торғай өңірі', period: '1838 жылдан кейін', description: 'Ақмола оқиғасынан кейін көтерілісшілер Торғай өңіріне көшті. Нүкте нақты көш жолын емес, деректе аталған кең өңірді көрсетеді.', people: 'Кенесары Қасымұлы, Жоламан Тіленшіұлы', position: [49.63, 63.5], zoom: 7 },
+  { name: 'Созақ бекінісі', period: '1841', description: 'Кенесары жасағы 1841 жылы Қоқан билігіндегі Сырдария бойы бекіністеріне шабуыл жасады. Созақ сол бекіністердің бірі болған.', people: 'Кенесары Қасымұлы', position: [43.9, 68.5], zoom: 9 },
+  { name: 'Жаңақорған бекінісі', period: '1841', description: '1841 жылы қоршауға алынған Қоқан бекіністерінің бірі. Картада қазіргі Жаңақорған елді мекенінің орны бағдар ретінде берілді.', people: 'Кенесары Қасымұлы', position: [43.9, 67.25], zoom: 9 },
+  { name: 'Ақмешіт бекінісі', period: '1841', description: '1841 жылы қоршауға алынған Қоқан бекіністерінің бірі. Қазіргі Қызылорда қаласының орнымен сәйкестендіру бағдар ретінде берілген.', people: 'Кенесары Қасымұлы', position: [44.85, 65.5], zoom: 9 },
+  { name: 'Жүлек бекінісі', period: '1841', description: 'E-history.kz дерегінде 1841 жылы қоршауға алынған Қоқан бекіністерінің қатарында аталады. Нүкте қазіргі елді мекеннің орнын шамамен көрсетеді.', people: 'Кенесары Қасымұлы', position: [44.3, 66.4], zoom: 9 },
+  { name: 'Іле–Алатау өңірі', period: '1846–1847', description: 'Кенесары жасағы Сарыарқадан Жетісу мен Алатау бөктеріне қарай шегінді. Нүкте жорық бағытын көрсетпейді, тек кең өңірге бағдар береді.', people: 'Кенесары Қасымұлы, Наурызбай батыр', position: [43.8, 77], zoom: 7 },
+  { name: 'Тоқмақ маңындағы соңғы шайқас', period: '1847', description: 'E-history.kz дерегінде Кенесарының соңғы шайқасы Қырғызстандағы Тоқмақ маңында болғаны көрсетілген. Белгі қала маңын ғана шамамен білдіреді.', people: 'Кенесары Қасымұлы', position: [42.83, 75.3], zoom: 8 },
 ]
 
 const theses: Thesis[] = [
@@ -705,64 +702,27 @@ function App() {
 
           {activePage === 'map' && (
           <section id="map" className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
-            <div className="mb-6 flex items-center gap-3"><MapPinned className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Тарихи карта</p><h2 className="text-3xl font-bold text-white">Көтерілістердің негізгі аймақтары</h2><p className="mt-2 text-sm text-slate-400">1836–1847 жылдардағы қозғалыстар мен Кенесары жасағының оңтүстікке қарай жылжуы</p></div></div>
+            <div className="mb-6 flex items-center gap-3"><MapPinned className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Тарихи карта</p><h2 className="text-3xl font-bold text-white">Көтерілістердің негізгі аймақтары</h2><p className="mt-2 text-sm text-slate-400">1836–1847 жылдардағы қозғалыстар мен Кенесары жасағының жорықтары</p></div></div>
             <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-              <div className="history-map-frame">
-                <div className="history-map">
-                  <svg className="history-map-art" viewBox="0 0 800 440" role="img" aria-labelledby="history-map-title history-map-description">
-                    <title id="history-map-title">Қазақстандағы көтерілістердің негізгі аймақтары</title>
-                    <desc id="history-map-description">Қазіргі Қазақстанның сұлбасы көрсетілген схемалық карта. Белгілерді таңдап, көтерілістер өткен өңірлер туралы оқыңыз.</desc>
-                    <defs>
-                      <linearGradient id="land-fill" x1="0" x2="1" y1="0" y2="1">
-                        <stop offset="0%" stopColor="#756448" />
-                        <stop offset="55%" stopColor="#60523d" />
-                        <stop offset="100%" stopColor="#8a7050" />
-                      </linearGradient>
-                      <pattern id="map-grain" width="22" height="22" patternUnits="userSpaceOnUse">
-                        <circle cx="3" cy="4" r="0.8" fill="#d7c08a" opacity="0.12" />
-                        <circle cx="16" cy="14" r="0.6" fill="#d7c08a" opacity="0.1" />
-                      </pattern>
-                    </defs>
-                    <path className="map-water" d="M0 0H800V440H0Z" />
-                    <path className="map-sea" d="M0 163C33 151 62 161 82 183 98 201 99 226 88 247 77 269 55 285 34 287L0 280Z" />
-                    <path className="map-sea map-aral-sea" d="M266 349C279 341 302 342 316 350 308 359 286 362 270 357Z" />
-                    <path className="map-land" d="M93 151L116 143 123 128 151 120 170 103 203 106 232 94 269 101 298 91 329 102 360 96 391 108 423 99 455 104 486 94 516 103 540 98 568 110 599 108 625 120 650 117 678 132 706 143 724 163 711 184 724 203 709 220 714 244 696 262 700 284 679 298 662 318 635 324 613 341 586 332 565 347 540 337 516 351 488 342 463 355 439 342 410 350 385 337 354 344 332 326 302 334 281 317 256 322 238 305 215 303 198 284 176 281 164 263 144 253 136 232 119 219 113 199 96 188 105 171Z" />
-                    <path className="map-grain-overlay" d="M93 151L116 143 123 128 151 120 170 103 203 106 232 94 269 101 298 91 329 102 360 96 391 108 423 99 455 104 486 94 516 103 540 98 568 110 599 108 625 120 650 117 678 132 706 143 724 163 711 184 724 203 709 220 714 244 696 262 700 284 679 298 662 318 635 324 613 341 586 332 565 347 540 337 516 351 488 342 463 355 439 342 410 350 385 337 354 344 332 326 302 334 281 317 256 322 238 305 215 303 198 284 176 281 164 263 144 253 136 232 119 219 113 199 96 188 105 171Z" />
-                    <path className="map-border-detail" d="M93 151L116 143 123 128 151 120 170 103 203 106 232 94 269 101 298 91 329 102 360 96 391 108 423 99 455 104 486 94 516 103 540 98 568 110 599 108 625 120 650 117 678 132 706 143 724 163 711 184 724 203 709 220 714 244 696 262 700 284 679 298 662 318 635 324 613 341 586 332 565 347 540 337 516 351 488 342 463 355 439 342 410 350 385 337 354 344 332 326 302 334 281 317 256 322 238 305 215 303 198 284 176 281 164 263 144 253 136 232 119 219 113 199 96 188 105 171Z" />
-                    <path className="map-region-line" d="M178 117L194 171 182 224 207 278M259 101L272 156 252 206 267 258 281 317M344 101L350 151 333 204 354 258 354 344M430 102L422 154 440 202 421 251 439 342M520 104L507 153 528 203 514 253 516 351M611 115L594 162 616 205 595 257 613 341M150 205L224 190 300 196 375 186 450 197 530 189 605 198 714 203M164 263L239 252 318 264 397 251 474 264 549 252 626 267 696 262" />
-                    <path className="map-river" d="M166 144C191 168 161 195 184 218S195 260 220 275M338 134C362 157 337 183 360 203S371 245 393 263" />
-                    <path className="map-route" d="M458 145C476 162 480 177 480 194S447 231 443 251S462 282 498 300S536 322 555 337" />
-                    <text className="map-water-label" x="63" y="295">Каспий теңізі</text>
-                    <text className="map-water-label" x="259" y="365">Арал теңізі</text>
-                    <text className="map-neighbor-label" x="398" y="68">РЕСЕЙ</text>
-                    <text className="map-neighbor-label" x="746" y="242" transform="rotate(90 746 242)">ҚЫТАЙ</text>
-                    <text className="map-neighbor-label" x="493" y="393">ҚЫРҒЫЗСТАН</text>
-                    <text className="map-neighbor-label" x="350" y="396">ӨЗБЕКСТАН</text>
-                    <text className="map-region-label" x="244" y="174">БАТЫС ҚАЗАҚСТАН</text>
-                    <text className="map-region-label" x="444" y="124">САРЫАРҚА</text>
-                    <text className="map-region-label" x="560" y="231">ЖЕТІСУ</text>
-                    <text className="map-compass" x="757" y="59">N ↑</text>
-                    <path className="map-scale" d="M48 392H108M48 387V397M108 387V397" />
-                    <text className="map-scale-label" x="48" y="411">шамамен 500 км</text>
-                  </svg>
-                  {mapLocations.map((item, index) => <button key={item.name} type="button" onClick={() => setSelectedMap(item)} className={`map-dot ${selectedMap.name === item.name ? 'map-dot-selected' : ''}`} style={{ left: item.left, top: item.top }} aria-label={`${index + 1}. ${item.name}, ${item.period}`} aria-pressed={selectedMap.name === item.name}><span>{index + 1}</span></button>)}
-                  <div className="map-caption"><span className="map-caption-dot" /> Көтеріліс өткен аймақ</div>
-                </div>
-                <p className="history-map-note">Схемалық карта: шекаралар қазіргі Қазақстан аумағын бағдар ретінде көрсетеді; тарихи оқиғалардың орны мен қозғалыс бағыты шамамен белгіленген.</p>
+              <div>
+                <Suspense fallback={<div className="history-map-frame"><div className="historical-leaflet-map grid place-items-center text-sm text-slate-600">Карта жүктелуде…</div></div>}>
+                  <HistoricalMap locations={mapLocations} selectedLocation={selectedMap} onSelectLocation={setSelectedMap} />
+                </Suspense>
+                <p className="history-map-note">Карта OpenStreetMap деректеріне негізделген және қазіргі географияны көрсетеді, тарихи шекараларды немесе нақты жорық жолын емес. Кең өңірлерге қойылған белгілер — бағдарлық нүктелер. Оқиғалар: <a href="https://e-history.kz/ru/history-of-kazakhstan/show/9190" target="_blank" rel="noreferrer">E-history.kz: Кенесары Қасымов көтерілісі</a>.</p>
               </div>
               <div className="flex flex-col gap-4">
+                <div className="rounded-[24px] border border-slate-700 bg-slate-950/50 p-4">
+                  <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-400">Картадан өңірді таңдаңыз</p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                    {mapLocations.map((item, index) => <button key={item.name} type="button" onClick={() => setSelectedMap(item)} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${selectedMap.name === item.name ? 'border-amber-400/60 bg-amber-400/10 text-amber-100' : 'border-slate-700/80 bg-slate-900/50 text-slate-300 hover:border-slate-500'}`} aria-pressed={selectedMap.name === item.name}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${selectedMap.name === item.name ? 'bg-amber-300 text-slate-950' : 'bg-slate-800 text-amber-200'}`}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.name}</span><span className="text-xs text-slate-400">{item.period}</span></span></button>)}
+                  </div>
+                </div>
                 <div className="rounded-[24px] border border-amber-400/20 bg-slate-950/60 p-5">
                   <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Таңдалған өңір · {mapLocations.findIndex((item) => item.name === selectedMap.name) + 1}</p>
                   <h3 className="mt-3 text-2xl font-bold text-white">{selectedMap.name}</h3>
                   <div className="mt-3 inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-200">{selectedMap.period}</div>
                   <p className="mt-5 leading-7 text-slate-200">{selectedMap.description}</p>
                   <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-900/60 p-4"><p className="text-sm uppercase tracking-[0.2em] text-slate-400">Қозғалыс жетекшілері</p><p className="mt-2 text-slate-100">{selectedMap.people}</p></div>
-                </div>
-                <div className="rounded-[24px] border border-slate-700 bg-slate-950/50 p-4">
-                  <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-400">Картадан өңірді таңдаңыз</p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                    {mapLocations.map((item, index) => <button key={item.name} type="button" onClick={() => setSelectedMap(item)} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${selectedMap.name === item.name ? 'border-amber-400/60 bg-amber-400/10 text-amber-100' : 'border-slate-700/80 bg-slate-900/50 text-slate-300 hover:border-slate-500'}`} aria-pressed={selectedMap.name === item.name}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${selectedMap.name === item.name ? 'bg-amber-300 text-slate-950' : 'bg-slate-800 text-amber-200'}`}>{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.name}</span><span className="text-xs text-slate-400">{item.period}</span></span></button>)}
-                  </div>
                 </div>
               </div>
             </div>
