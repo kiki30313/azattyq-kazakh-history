@@ -129,7 +129,7 @@ create trigger on_auth_user_created_profile
   for each row execute function public.create_student_profile();
 
 create or replace function public.list_assessment_questions(p_slug text)
-returns table (assessment_id uuid, assessment_slug text, assessment_title text, question_id uuid, position integer, prompt text, choices jsonb)
+returns table (assessment_id uuid, assessment_slug text, assessment_title text, question_id uuid, "position" integer, prompt text, choices jsonb)
 language sql
 stable
 security definer

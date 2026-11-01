@@ -16,8 +16,6 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import steppeArtwork from './assets/steppe-hero.svg'
-import heroPhoto from '../d6069ace81b84925.webp'
 import HistoryTutor, { type ChatMessage } from './components/HistoryTutor'
 import { AdminDashboard, AuthPage, StudentDashboard } from './components/AccountPages'
 import { AuthProvider } from './components/AuthContext'
@@ -59,6 +57,15 @@ type Person = {
   role: string
   movement: string
   description: string
+  image?: {
+    src: string
+    alt: string
+    caption: string
+    credit: string
+    source?: string
+    license?: string
+    objectPosition?: string
+  }
 }
 
 type GlossaryItem = {
@@ -192,17 +199,41 @@ const facts: Fact[] = [
 ]
 
 const personalities: Person[] = [
-  { name: 'Кенесары Қасымұлы', years: '1802–1847', role: 'Хан, әскери қолбасшы', movement: 'Кенесары көтерілісі', description: 'Ресейге қарсы бүкіл қазақ даласын біріктіруге ұмтылған жетекші тұлға.' },
-  { name: 'Наурызбай Қасымұлы', years: 'XIX ғасыр', role: 'Қолбасшы, саяси жетекші', movement: 'Кенесары көтерілісі', description: 'Кенесары қозғалысының әскери-әкімшілік құрылымындағы маңызды тұлға.' },
-  { name: 'Иман Дулатұлы', years: 'XIX ғасыр', role: 'Батыр, қолбасшы', movement: 'Кенесары көтерілісі', description: 'Көтеріліс тарихында дербес әскери әрекеттерімен танымал тұлға.' },
-  { name: 'Ағыбай батыр', years: 'XIX ғасыр', role: 'Батыр', movement: 'Кенесары көтерілісі', description: 'Көтерілістің әскери штабтасқан бір топтың жетекшісі ретінде белгілі.' },
-  { name: 'Бұқарбай батыр', years: 'XIX ғасыр', role: 'Батыр, жауынгер', movement: 'Кенесары көтерілісі', description: 'Көтеріліс өрісіндегі батырлық істерімен танымал.' },
-  { name: 'Жанқожа Нұрмұхамедұлы', years: 'XIX ғасыр', role: 'Әскербасшы, көмекші жетекші', movement: 'Кенесары көтерілісі', description: 'Оқиғалардың саяси-әскери бағыттарында маңызды рөл атқарған.' },
-  { name: 'Сырым Датұлы', years: '1742–1802', role: 'Хан, көтеріліс жетекшісі', movement: 'Сырым Датұлы көтерілісі', description: 'Ресей отарлау саясатына қарсы алғашқы кең көлемді қозғалысқа жетекшілік етті.' },
-  { name: 'Исатай Тайманұлы', years: '1791–1838', role: 'Батыр, қозғалыс жетекшісі', movement: 'Исатай мен Махамбет көтерілісі', description: 'Орталық Ресейге қарсы күрестің маңызды көсемдерінің бірі.' },
-  { name: 'Махамбет Өтемісұлы', years: '1770–1838', role: 'Ақын, батыр, көтеріліс жетекшісі', movement: 'Исатай мен Махамбет көтерілісі', description: 'Поэзиясы мен батырлық қызметімен бірге, отарлауға қарсы рухтың символы.' },
-  { name: 'Әбдіғапар Жанбосынұлы', years: 'XIX ғасыр', role: 'Жауынгер, қолбасшы', movement: 'Кенесары көтерілісі', description: 'Көтерілістің әскери белсенділігін арттыратын жақын жетекшілердің бірі.' },
+  { name: 'Кенесары Қасымұлы', years: '1802–1847', role: 'Хан, әскери қолбасшы', movement: 'Кенесары көтерілісі', description: 'Ресейге қарсы бүкіл қазақ даласын біріктіруге ұмтылған жетекші тұлға.', image: { src: '/images/portraits/Kenesary_Kasymov.jfif', alt: 'Кенесары Қасымұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Наурызбай Қасымұлы', years: 'XIX ғасыр', role: 'Қолбасшы, саяси жетекші', movement: 'Кенесары көтерілісі', description: 'Кенесары қозғалысының әскери-әкімшілік құрылымындағы маңызды тұлға.', image: { src: '/images/portraits/Nauryzbai_Kasymuly.jpg', alt: 'Наурызбай Қасымұлы бейнеленген тарихи көрініс', caption: 'ТАРИХИ КӨРІНІС · КӨРКЕМДІК БЕЙНЕ', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Иман Дулатұлы', years: 'XIX ғасыр', role: 'Батыр, қолбасшы', movement: 'Кенесары көтерілісі', description: 'Көтеріліс тарихында дербес әскери әрекеттерімен танымал тұлға.', image: { src: '/images/portraits/Iman_Dulatuly.jpg', alt: 'Иман Дулатұлына арналған ескерткіш бюст', caption: 'ИМАН БАТЫР ЕСКЕРТКІШІ · ФОТОПОРТРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Ағыбай батыр', years: 'XIX ғасыр', role: 'Батыр', movement: 'Кенесары көтерілісі', description: 'Көтерілістің әскери штабтасқан бір топтың жетекшісі ретінде белгілі.', image: { src: '/images/portraits/Agybai_Konyrbaiuly.jfif', alt: 'Ағыбай батырдың көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Бұқарбай батыр', years: 'XIX ғасыр', role: 'Батыр, жауынгер', movement: 'Кенесары көтерілісі', description: 'Көтеріліс өрісіндегі батырлық істерімен танымал.', image: { src: '/images/portraits/Bukarbai_Batyr.jpg', alt: 'Бұқарбай батырдың көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Жанқожа Нұрмұхамедұлы', years: 'XIX ғасыр', role: 'Әскербасшы, көмекші жетекші', movement: 'Кенесары көтерілісі', description: 'Оқиғалардың саяси-әскери бағыттарында маңызды рөл атқарған.', image: { src: '/images/portraits/Zhankozha_Nurmukhameduly.jpg', alt: 'Жанқожа Нұрмұхамедұлының көркем бейнесі', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Сырым Датұлы', years: '1742–1802', role: 'Хан, көтеріліс жетекшісі', movement: 'Сырым Датұлы көтерілісі', description: 'Ресей отарлау саясатына қарсы алғашқы кең көлемді қозғалысқа жетекшілік етті.', image: { src: '/images/portraits/Syrym_Datuly.jpg', alt: 'Сырым Датұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Исатай Тайманұлы', years: '1791–1838', role: 'Батыр, қозғалыс жетекшісі', movement: 'Исатай мен Махамбет көтерілісі', description: 'Орталық Ресейге қарсы күрестің маңызды көсемдерінің бірі.', image: { src: '/images/portraits/Isataj_Tajmanuly.jpg', alt: 'Исатай Тайманұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Махамбет Өтемісұлы', years: '1770–1838', role: 'Ақын, батыр, көтеріліс жетекшісі', movement: 'Исатай мен Махамбет көтерілісі', description: 'Поэзиясы мен батырлық қызметімен бірге, отарлауға қарсы рухтың символы.', image: { src: '/images/portraits/mahambet_utemisov.jpg', alt: 'Махамбет Өтемісұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС', credit: 'Пайдаланушы ұсынған сурет' } },
+  { name: 'Әбдіғапар Жанбосынұлы', years: '1870–1919', role: '1916 жылғы көтеріліс басшысы', movement: 'Торғайдағы 1916 жылғы көтеріліс', description: 'Торғай даласындағы 1916 жылғы ұлт-азаттық қозғалыстың жетекшісі.' },
 ]
+
+const eraVisuals = [
+  { src: '/images/portraits/Syrym_Datuly.jpg', alt: 'Сырым Датұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС' },
+  { src: '/images/portraits/Isataj_Tajmanuly.jpg', alt: 'Исатай Тайманұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС' },
+  { src: '/images/portraits/Kenesary_Kasymov.jfif', alt: 'Кенесары Қасымұлының көркем портреті', caption: 'ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС' },
+  { src: '/images/1916_koterilis.jpg', alt: '1916 жылғы ұлт-азаттық көтеріліс көрінісін бейнелейтін тарихи сурет', caption: '1916 ЖЫЛҒЫ КӨТЕРІЛІС · КӨРКЕМ СУРЕТ' },
+]
+
+function PersonPortrait({ person, index, className = '' }: { person: Person; index: number; className?: string }) {
+  if (!person.image) {
+    return (
+      <span className={`portrait-etching portrait-etching-${index % 4 + 1} ${className}`} aria-label={`${person.name}: тарихи сурет әлі қосылмаған`}>
+        <span />
+      </span>
+    )
+  }
+
+  return (
+    <span className={`person-portrait ${className}`}>
+      <img src={person.image.src} alt={person.image.alt} loading="lazy" style={{ objectPosition: person.image.objectPosition }} />
+      <span>{person.image.caption}</span>
+    </span>
+  )
+}
 
 const glossary: GlossaryItem[] = [
   { term: 'Отарлау', definition: 'Бір мемлекеттің немесе империяның басқа ел немесе халықтың аумағына әскери, саяси және экономикалық ықпалын арттыруы.', example: 'Ресей империясы XIX ғасырда Қазақ даласына әскери-әкімшілік бақылау орнатты.' },
@@ -306,10 +337,6 @@ function App() {
   useEffect(() => {
     const updateScrollState = () => {
       setIsScrolled(window.scrollY > 24)
-      const art = document.querySelector<HTMLElement>('.hero-art')
-      if (art && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        art.style.transform = `translate3d(0, ${Math.min(window.scrollY * 0.12, 90)}px, 0) scale(1.06)`
-      }
     }
     updateScrollState()
     window.addEventListener('scroll', updateScrollState, { passive: true })
@@ -612,8 +639,6 @@ function App() {
           {activePage === 'home' && (
           <div className="home-story">
           <section id="home" className="hero-scene">
-            <img className="hero-art" src={heroPhoto} alt="Қазақ даласындағы аттылы көрініс" fetchPriority="high" />
-            <div className="hero-shade" />
             <div className="hero-meta hero-meta-top"><span>ЦИФРЛЫҚ ТАРИХИ ЗЕРТТЕУ</span><span>01 / 04</span></div>
             <div className="hero-copy">
               <p className="hero-eyebrow"><span /> ТАРИХТЫҢ ІЗІМЕН</p>
@@ -627,7 +652,6 @@ function App() {
             </div>
             <div className="hero-period"><span>ҚАРСЫЛЫҚТЫҢ ҒАСЫРЛАРЫ</span><strong>1783 <i>—</i> 1916</strong></div>
             <button type="button" className="hero-scroll" onClick={() => document.getElementById('story-intro')?.scrollIntoView({ behavior: 'smooth' })}><span>ТӨМЕН ЖЫЛЖЫТЫҢЫЗ</span><i /></button>
-            <span className="hero-art-credit">ҚАЗАҚ ДАЛАСЫНДАҒЫ АТТЫЛЫ КӨРІНІС</span>
           </section>
 
           <section id="story-intro" className="story-intro editorial-section">
@@ -640,8 +664,8 @@ function App() {
               <button type="button" className="historical-note" onClick={cycleFact}><span>ТАРИХИ ДЕРЕК · КЕЛЕСІСІН КӨРУ</span><p>{funFacts[factIndex]}</p><ArrowRight size={15} /></button>
             </div>
             <figure className="intro-figure">
-              <img src={steppeArtwork} alt="Таңғы тұман басқан кең дала — көркемдік реконструкция" loading="lazy" />
-              <figcaption><span>ДАЛА КЕҢІСТІГІ</span><span>Көркемдік реконструкция, нақты архивтік фото емес</span></figcaption>
+              <img src="/images/kirispe_image.jfif" alt="Қазақ даласындағы көш көрінісін бейнелейтін тарихи көркем сурет" loading="lazy" />
+              <figcaption><span>ДАЛАДАҒЫ КӨШІ-ҚОН</span><span>Тарихи тақырыптағы көркем сурет</span></figcaption>
             </figure>
             <div className="story-side-note">БІР ДАЛА.<br />КӨП ДАУЫС.</div>
           </section>
@@ -651,18 +675,25 @@ function App() {
               <div><p className="eyebrow">1783 — 1916 · ТАРИХИ ШОЛУ</p><h2>Бір ғасыр.<br /><em>Бірнеше көтеріліс.</em></h2></div>
               <p className="section-deck">Әр көтеріліс өз уақытының талабынан туды. Төрт кезең — бір кең тарихи әңгіме.</p>
             </div>
-            <div className="era-grid">{[timelineData[0], timelineData[3], timelineData[4], timelineData[9]].map((event, index) => <button key={event.year} type="button" className={`era-card era-card-${index + 1}`} onClick={() => { setSelectedEvent(event); navigateTo('timeline') }}><span className="era-image" style={{ backgroundImage: `url(${steppeArtwork})` }}><span className="era-image-index">0{index + 1}</span><span className="era-image-label">КӨРКЕМДІК БЕЙНЕ</span></span><span className="era-date">{event.year}</span><span className="era-title">{['Сырым Датұлы', 'Исатай мен Махамбет', 'Кенесары Қасымұлы', '1916 жылғы көтеріліс'][index]}</span><span className="era-description">{event.description}</span><span className="era-open">ТАРИХҚА ӨТУ <ArrowRight size={14} /></span></button>)}</div>
+            <div className="era-grid">{[timelineData[0], timelineData[3], timelineData[4], timelineData[9]].map((event, index) => {
+              const visual = eraVisuals[index]
+              return <button key={event.year} type="button" className={`era-card era-card-${index + 1}`} onClick={() => { setSelectedEvent(event); navigateTo('timeline') }}>
+                <span className="era-image"><img src={visual.src} alt={visual.alt} loading="lazy" /><span className="era-image-index">0{index + 1}</span><span className="era-image-label">{visual.caption}</span></span>
+                <span className="era-date">{event.year}</span><span className="era-title">{['Сырым Датұлы', 'Исатай мен Махамбет', 'Кенесары Қасымұлы', '1916 жылғы көтеріліс'][index]}</span><span className="era-description">{event.description}</span><span className="era-open">ТАРИХҚА ӨТУ <ArrowRight size={14} /></span>
+              </button>
+            })}</div>
+            <div className="image-credit-list" aria-label="Кезең суреттерінің дереккөзі">СУРЕТТЕРДІ ПАЙДАЛАНУШЫ ҰСЫНДЫ</div>
             <button type="button" className="editorial-link era-all-link" onClick={() => navigateTo('timeline')}>Толық хронология <ArrowRight size={16} /></button>
           </section>
 
           <section className="kenesary-feature editorial-section">
-            <div className="kenesary-image" role="img" aria-label="Көркемдік реконструкция: Сарыарқадағы атты жасақтар" style={{ backgroundImage: `url(${steppeArtwork})` }}><span>КӨРКЕМДІК РЕКОНСТРУКЦИЯ</span></div>
+            <div className="kenesary-image"><img src="/images/portraits/Kenesary_Kasymov.jfif" alt="Кенесары Қасымұлының көркем портреті" loading="lazy" /><span>ТАРИХИ КӨРКЕМ БЕЙНЕ · ФОТОСУРЕТ ЕМЕС</span></div>
             <div className="kenesary-copy"><p className="eyebrow">1837 — 1847 · НЕГІЗГІ ТАРАУ</p><span className="kenesary-number">10</span><p className="kenesary-number-caption">ЖЫЛҒА СОЗЫЛҒАН КҮРЕС</p><h2>Он жылдық<br /><em>қарсылық.</em></h2><p>Кенесары Қасымұлы бастаған қозғалыс қазақ даласының кең аумағын қамтыған саяси әрі әскери күрес болды. Оның жолы келіссөзден қарулы қақтығысқа, Сарыарқадан оңтүстікке қарай жылжыды.</p><button type="button" className="editorial-link" onClick={() => navigateTo('study')}>Тарауды зерттеу <ArrowRight size={16} /></button></div>
           </section>
 
           <section className="people-preview editorial-section">
             <div className="section-heading"><div><p className="eyebrow">ҚОЗҒАЛЫСТЫҢ ЖҮЗДЕРІ</p><h2>Тұлғалар.<br /><em>Тарихи іздер.</em></h2></div><button type="button" className="editorial-link" onClick={() => navigateTo('knowledge')}>10 тұлғаның барлығы <ArrowRight size={16} /></button></div>
-            <div className="people-editorial-grid">{[personalities[0], personalities[6], personalities[7], personalities[8]].map((person, index) => <button type="button" className={`people-editorial-item people-editorial-item-${index + 1}`} key={person.name} onClick={() => navigateTo('knowledge')}><span className={`portrait-etching portrait-etching-${index + 1}`} aria-hidden="true"><span /></span><span className="portrait-disclaimer">ШАРТТЫ КӨРКЕМДІК СИЛУЭТ</span><span className="people-editorial-name">{person.name}</span><span className="people-editorial-years">{person.years}</span></button>)}</div>
+            <div className="people-editorial-grid">{[personalities[0], personalities[6], personalities[7], personalities[8]].map((person, index) => <button type="button" className={`people-editorial-item people-editorial-item-${index + 1}`} key={person.name} onClick={() => navigateTo('knowledge')}><PersonPortrait person={person} index={index} /><span className="portrait-disclaimer">{person.image ? person.image.caption : 'СУРЕТ ФАЙЛЫ ӘЛІ ҚОСЫЛМАҒАН'}</span><span className="people-editorial-name">{person.name}</span><span className="people-editorial-years">{person.years}</span></button>)}</div>
           </section>
 
           <section className="final-challenge editorial-section">
@@ -759,7 +790,7 @@ function App() {
 
           <section id="people" className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
             <div className="mb-6 flex items-center gap-3"><Users className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">10 тарихи тұлға</p><h2 className="text-3xl font-bold text-white">Қозғалыстың жетекшілері</h2></div></div>
-            <div className="people-archive-grid">{personalities.map((person, index) => <article key={person.name} className={`person-archive-card person-archive-card-${index + 1}`}><div className={`portrait-etching portrait-etching-${index % 4 + 1}`} aria-hidden="true"><span /></div><p className="portrait-disclaimer">ШАРТТЫ КӨРКЕМДІК СИЛУЭТ · НАҚТЫ ПОРТРЕТ ЕМЕС</p><h3>{person.name}</h3><p className="person-years">{person.years}</p><p className="person-role">{person.role}</p><p className="person-movement">{person.movement}</p><p className="person-description">{person.description}</p></article>)}</div>
+            <div className="people-archive-grid">{personalities.map((person, index) => <article key={person.name} className={`person-archive-card person-archive-card-${index + 1}`}><PersonPortrait person={person} index={index} /><p className="portrait-disclaimer">{person.image ? person.image.caption : 'СУРЕТ ФАЙЛЫ ӘЛІ ҚОСЫЛМАҒАН'}</p>{person.image && (person.image.source ? <a className="portrait-source" href={person.image.source} target="_blank" rel="noreferrer">Сурет көзі: {person.image.credit}{person.image.license ? ` · ${person.image.license}` : ''}</a> : <span className="portrait-source">{person.image.credit}</span>)}<h3>{person.name}</h3><p className="person-years">{person.years}</p><p className="person-role">{person.role}</p><p className="person-movement">{person.movement}</p><p className="person-description">{person.description}</p></article>)}</div>
           </section>
           </div>}
 
