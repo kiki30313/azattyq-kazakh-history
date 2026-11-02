@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { ArrowRight, LogOut, Search, ShieldCheck, UserRound, Users } from 'lucide-react'
+import { ArrowRight, CheckCircle2, LogOut, Search, ShieldCheck, UserRound, Users, XCircle } from 'lucide-react'
 import { useAuth } from './useAuth'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { surveyApiUrl } from '../lib/surveyApi'
@@ -52,6 +52,28 @@ type AdminSurveyResponses = {
   responses: SurveySubmission[]
   totalCount: number
   hasMore: boolean
+}
+
+function isSurveyAnswerCorrect(questionId: number, answer: SurveyAnswer | undefined) {
+  if (answer === undefined) return undefined
+  const question = surveyQuestions.find((item) => item.id === questionId)
+  if (!question?.correctAnswers) return null
+  if (question.type === 'multiple') {
+    return Array.isArray(answer)
+      && answer.length === question.correctAnswers.length
+      && question.correctAnswers.every((correctAnswer) => answer.includes(correctAnswer))
+  }
+  return typeof answer === 'string' && question.correctAnswers.includes(answer)
+}
+
+function getSurveyScore(submission: SurveySubmission) {
+  const gradableQuestions = surveyQuestions.filter((question) => question.correctAnswers)
+  return {
+    correct: gradableQuestions.filter((question) => (
+      isSurveyAnswerCorrect(question.id, submission.answers[String(question.id)]) === true
+    )).length,
+    total: gradableQuestions.length,
+  }
 }
 
 async function fetchAdminSurveyResponses(accessToken: string, offset: number): Promise<AdminSurveyResponses> {
@@ -236,7 +258,6 @@ export function AdminDashboard() {
   const [notice, setNotice] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isAdjusting, setIsAdjusting] = useState(false)
-
   const loadStudents = useCallback(async (searchTerm: string) => {
     if (!supabase || !session) return
     setIsLoading(true)
@@ -376,30 +397,47 @@ export function AdminDashboard() {
             ? <button type="button" className="account-secondary" onClick={() => setSurveyResponseRetry((retry) => retry + 1)}>Қайта жүктеу</button>
             : surveyResponses.length === 0
             ? <p className="account-empty">Әзірге сауалнама жауабы жоқ.</p>
-            : <div className="admin-survey-response-list">{surveyResponses.map((submission) => (
+            : <div className="admin-survey-response-list">{surveyResponses.map((submission) => {
+              const score = getSurveyScore(submission)
+              return (
               <details className="admin-survey-response" key={submission.id}>
                 <summary>
                   <strong>{submission.respondent_name}</strong>
-                  <span>{new Date(submission.created_at).toLocaleString('kk-KZ')}</span>
+                  <span className="admin-survey-response-meta">
+                    <span className={`admin-survey-score ${score.correct === score.total ? 'is-perfect' : ''}`}>{score.correct}/{score.total} дұрыс</span>
+                    <span>{new Date(submission.created_at).toLocaleString('kk-KZ')}</span>
+                  </span>
                 </summary>
                 <dl>
                   {surveyQuestions.map((question) => {
                     const answer = submission.answers[String(question.id)]
                     const answerText = Array.isArray(answer) ? answer.join(' · ') : answer
+                    const isCorrect = isSurveyAnswerCorrect(question.id, answer)
+                    const correctAnswerText = question.correctAnswers?.join(' · ')
                     return (
-                      <div className="admin-survey-answer" key={question.id}>
+                      <div className={`admin-survey-answer ${isCorrect === null || isCorrect === undefined ? '' : isCorrect ? 'is-correct' : 'is-incorrect'}`} key={question.id}>
                         <dt>{question.id}. {question.prompt}</dt>
                         <dd className={question.type === 'open' ? 'is-open-answer' : ''}>
-                          {answerText || 'Жауап берілмеген'}
+                          <span>{answerText || 'Жауап берілмеген'}</span>
+                          {isCorrect === null
+                            ? <span className="admin-survey-answer-status is-ungraded">Бағаланбайды</span>
+                            : isCorrect === undefined
+                              ? <span className="admin-survey-answer-status is-ungraded">Жауап берілмеген</span>
+                              : <span className={`admin-survey-answer-status ${isCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                              {isCorrect ? <CheckCircle2 size={14} aria-hidden="true" /> : <XCircle size={14} aria-hidden="true" />}
+                              {isCorrect ? 'Дұрыс' : 'Қате'}
+                            </span>}
+                          {isCorrect === false && correctAnswerText && <small className="admin-survey-correct-answer">Дұрыс жауап: {correctAnswerText}</small>}
                         </dd>
                       </div>
                     )
                   })}
                 </dl>
               </details>
-            ))}</div>}
+            )})}</div>}
         {hasMoreSurveyResponses && <button type="button" className="account-secondary admin-survey-load-more" onClick={() => void loadMoreSurveyResponses()} disabled={isLoadingSurveyResponses}>{isLoadingSurveyResponses ? 'Жүктелуде…' : 'Тағы жауап жүктеу'}</button>}
       </section>
+      {session && <>
       <form className="account-search" onSubmit={(event) => void searchStudents(event)}><Search size={17} /><input className={controlClass} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Аты немесе email арқылы іздеу" /><button type="submit" className="account-secondary" disabled={isLoading}>{isLoading ? 'Іздеу…' : 'Іздеу'}</button></form>
       <div className="admin-student-list">{students.map((student) => <button type="button" className={`admin-student-row ${selected?.profile.id === student.id ? 'is-selected' : ''}`} onClick={() => void loadStudent(student.id)} key={student.id}><UserRound size={18} /><span><strong>{student.display_name}</strong><small>{student.email}</small></span><span className="admin-student-metrics">{student.total_points} ұпай · {student.attempt_count} тест</span></button>)}</div>
       {selected && <div className="admin-detail">
@@ -416,6 +454,7 @@ export function AdminDashboard() {
         <h3>Қолмен түзету журналы</h3>
         {selected.adjustments.length ? <ul className="adjustment-list">{selected.adjustments.map((entry) => <li key={entry.id}><strong>{entry.delta > 0 ? '+' : ''}{entry.delta} ұпай</strong><span>{entry.reason}{entry.comment ? ` · ${entry.comment}` : ''}</span><small>{entry.actor_name} · {new Date(entry.created_at).toLocaleString('kk-KZ')}</small></li>)}</ul> : <p className="account-empty">Түзету журналы бос.</p>}
       </div>}
+      </>}
     </section>
   )
 }

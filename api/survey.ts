@@ -17,6 +17,7 @@ type SurveySubmission = {
 const MAX_BODY_BYTES = 16 * 1024
 const MAX_NAME_LENGTH = 100
 const MAX_OPEN_ANSWER_LENGTH = 1000
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const setSecurityHeaders = (response: VercelResponse) => {
   response.setHeader('Cache-Control', 'no-store')
@@ -180,9 +181,12 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (Buffer.byteLength(JSON.stringify(body), 'utf8') > MAX_BODY_BYTES) {
     return respondError(response, 413, 'Сауалнама жауабы тым үлкен.')
   }
-  const payload = body as { name?: unknown; answers?: unknown }
+  const payload = body as { name?: unknown; answers?: unknown; deviceId?: unknown }
   if (typeof payload.name !== 'string' || payload.name.trim().length < 2 || payload.name.trim().length > MAX_NAME_LENGTH) {
     return respondError(response, 400, 'Атыңызды 2–100 таңба аралығында енгізіңіз.')
+  }
+  if (typeof payload.deviceId !== 'string' || !DEVICE_ID_PATTERN.test(payload.deviceId)) {
+    return respondError(response, 400, 'Құрылғы идентификаторы жарамсыз. Бетті жаңартып, қайталап көріңіз.')
   }
   if (!validateAnswers(payload.answers)) {
     return respondError(response, 400, 'Барлық сұраққа жарамды жауап беріңіз.')
@@ -191,8 +195,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
   try {
     const { error } = await supabase
       .from('survey_submissions')
-      .insert({ respondent_name: payload.name.trim(), answers: payload.answers })
+      .insert({
+        respondent_name: payload.name.trim(),
+        answers: payload.answers,
+        device_id: payload.deviceId,
+      })
     if (error) {
+      if (error.code === '23505') {
+        return respondError(response, 409, 'Бұл құрылғыдан сауалнамаға жауап жіберілген. Бір құрылғыдан бір рет қатысуға болады.')
+      }
       console.error('Survey response insert failed', { code: error.code ?? 'UNKNOWN' })
       return respondError(response, 503, 'Жауапты сақтау мүмкін болмады. Кейінірек қайталап көріңіз.')
     }
