@@ -19,9 +19,39 @@ const emptyResults: SurveyResults = {
   })),
 }
 
+const DEVICE_ID_STORAGE_KEY = 'azattyq-survey-device-id'
+const DEVICE_SUBMITTED_STORAGE_KEY = 'azattyq-survey-submitted'
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 function percentage(count: number, total: number) {
   if (total === 0) return 0
   return Math.round((count / total) * 1000) / 10
+}
+
+function createDeviceId() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+function getDeviceRegistration() {
+  try {
+    let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY)
+    if (!deviceId || !DEVICE_ID_PATTERN.test(deviceId)) {
+      deviceId = createDeviceId()
+      localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId)
+    }
+    return {
+      deviceId,
+      status: localStorage.getItem(DEVICE_SUBMITTED_STORAGE_KEY) === 'true' ? 'submitted' as const : 'ready' as const,
+    }
+  } catch {
+    return { deviceId: '', status: 'unavailable' as const }
+  }
 }
 
 async function fetchSurveyResults() {
@@ -40,6 +70,7 @@ export default function SurveyExperience() {
   const [previewComplete, setPreviewComplete] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
+  const [deviceRegistration, setDeviceRegistration] = useState(getDeviceRegistration)
 
   const hardestQuestion = useMemo(
     () => results.questions
@@ -102,11 +133,17 @@ export default function SurveyExperience() {
       const response = await fetch(surveyApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ name: respondentName.trim(), answers }),
+        body: JSON.stringify({ name: respondentName.trim(), answers, deviceId: deviceRegistration.deviceId }),
       })
       const result = await response.json() as { error?: string }
+      if (response.status === 409) {
+        setDeviceRegistration((previous) => ({ ...previous, status: 'submitted' }))
+        localStorage.setItem(DEVICE_SUBMITTED_STORAGE_KEY, 'true')
+      }
       if (!response.ok) throw new Error(result.error || 'Жауапты сақтау мүмкін болмады.')
 
+      setDeviceRegistration((previous) => ({ ...previous, status: 'submitted' }))
+      localStorage.setItem(DEVICE_SUBMITTED_STORAGE_KEY, 'true')
       setPreviewComplete(true)
       setRespondentName('')
       setAnswers({})
@@ -155,8 +192,16 @@ export default function SurveyExperience() {
         <div className="survey-form-view">
           <div className="survey-form-note">
             <div><strong>Сұрақтардың үш түрі</strong><p>Ашық, жабық және бірнеше жауап таңдауға болатын сұрақтар.</p></div>
-            <p>Жауаптар дерекқорға жіберіліп, нәтижелер нақты жауаптардан есептеледі.</p>
+            <p>Бір браузерден бір рет қатысуға болады. Статистика сақталған жауаптардан есептеледі.</p>
           </div>
+          {deviceRegistration.status === 'submitted' ? (
+            <div className="survey-device-complete" role="status">
+              <CheckCircle2 size={22} />
+              <div><strong>Бұл құрылғыдан сауалнама өтілді</strong><p>Бір құрылғыдан бір жауап қабылданады. Нәтижелерді бөлек бөлімнен көре аласыз.</p></div>
+            </div>
+          ) : deviceRegistration.status === 'unavailable' ? (
+            <p className="survey-validation-message" role="alert">Құрылғыны белгілеу мүмкін болмады. Браузердің жергілікті сақтауын қосып, бетті жаңартыңыз.</p>
+          ) : (
           <form onSubmit={(event) => void submitSurvey(event)}>
             <label className="survey-name-field">
               <span>Атыңыз</span>
@@ -195,15 +240,16 @@ export default function SurveyExperience() {
               ))}
             </div>
             <div className="survey-submit-row">
-              <p>Атыңыз құпия сақталады; жария түрде тек жиынтық статистика көрсетіледі.</p>
-              <button type="submit" className="survey-submit" disabled={isSubmitting}>
+              <p>Бір құрылғыдан бір жауап қабылданады. Атыңыз құпия сақталады; жария түрде тек жиынтық статистика көрсетіледі.</p>
+              <button type="submit" className="survey-submit" disabled={isSubmitting || deviceRegistration.status !== 'ready'}>
                 {isSubmitting ? <><LoaderCircle className="account-spinner" size={16} /> Сақталуда…</> : <>Жауапты жіберу <ArrowRight size={17} /></>}
               </button>
             </div>
-          </form>
           {validationMessage && <p className="survey-validation-message" role="alert">{validationMessage}</p>}
           {submitError && <p className="survey-validation-message" role="alert">{submitError}</p>}
           {previewComplete && <p className="survey-preview-success" role="status"><CheckCircle2 size={18} /> Жауаптарыңыз сақталды. Қатысқаныңызға рақмет!</p>}
+          </form>
+          )}
         </div>
       ) : (
         <div className="survey-results-view">
@@ -231,6 +277,7 @@ export default function SurveyExperience() {
                   options: (question.options ?? []).map((label) => ({ label, count: 0 })),
                 }
                 const errors = result.correctCount === null ? null : result.responseCount - result.correctCount
+                const responseRate = percentage(result.responseCount, results.respondentCount)
                 return (
                   <article className="survey-result-question" key={question.id}>
                     <div className="survey-result-heading">
@@ -238,17 +285,22 @@ export default function SurveyExperience() {
                       <div><span className={`survey-type survey-type-${question.type}`}>{questionTypeLabels[question.type]}</span><h2>{question.prompt}</h2></div>
                       {errors !== null && result.responseCount > 0 && <strong className="survey-error-rate">{percentage(errors, result.responseCount)}% қате</strong>}
                     </div>
+                    <div className="survey-question-participation">
+                      <div><span>Жауап саны</span><strong>{result.responseCount} / {results.respondentCount} адам · {responseRate}%</strong></div>
+                      <div className="survey-result-track" role="progressbar" aria-label={`${question.id}-сұраққа жауап бергендер үлесі`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={responseRate}>
+                        <span style={{ width: `${responseRate}%` }} />
+                      </div>
+                    </div>
                     {question.type === 'open' ? (
                       <div className="survey-theme-list">
                         {result.options.length > 0 ? result.options.map((option) => (
                           <div className="survey-result-row" key={option.label}>
-                            <div className="survey-result-row-label"><span>{option.label}</span><strong>{percentage(option.count, result.responseCount)}% <small>({option.count})</small></strong></div>
-                            <div className="survey-result-track"><span style={{ width: `${percentage(option.count, result.responseCount)}%` }} /></div>
+                            <div className="survey-result-row-label"><span>{option.label}</span><strong>{percentage(option.count, result.responseCount)}% <small>({option.count} жауап)</small></strong></div>
+                            <div className="survey-result-track" role="progressbar" aria-label={option.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage(option.count, result.responseCount)}><span style={{ width: `${percentage(option.count, result.responseCount)}%` }} /></div>
                           </div>
                         )) : (
                           <>
-                            <div className="survey-result-row-label"><span>Жауап бергендер</span><strong>{percentage(result.responseCount, results.respondentCount)}% <small>({result.responseCount})</small></strong></div>
-                            <div className="survey-result-track"><span style={{ width: `${percentage(result.responseCount, results.respondentCount)}%` }} /></div>
+                            <div className="survey-result-row-label"><span>Жауап бергендер</span><strong>{responseRate}% <small>({result.responseCount} жауап)</small></strong></div>
                             <p className="survey-result-footnote">Ашық жауаптар жеке дерек ретінде сақталады және жарияланбайды.</p>
                           </>
                         )}
@@ -259,9 +311,10 @@ export default function SurveyExperience() {
                           const optionResult = result.options.find((item) => item.label === option)
                           const count = optionResult?.count ?? 0
                           const isCorrect = question.correctAnswers?.includes(option) ?? false
-                          return <div className={`survey-result-row ${isCorrect ? 'is-correct' : ''}`} key={option}><div className="survey-result-row-label"><span>{option}{isCorrect ? ' · дұрыс жауап' : ''}</span><strong>{percentage(count, result.responseCount)}% <small>({count})</small></strong></div><div className="survey-result-track"><span style={{ width: `${percentage(count, result.responseCount)}%` }} /></div></div>
+                          const optionRate = percentage(count, result.responseCount)
+                          return <div className={`survey-result-row ${isCorrect ? 'is-correct' : ''}`} key={option}><div className="survey-result-row-label"><span>{option}{isCorrect ? ' · дұрыс жауап' : ''}</span><strong>{optionRate}% <small>({count} жауап)</small></strong></div><div className="survey-result-track" role="progressbar" aria-label={option} aria-valuemin={0} aria-valuemax={100} aria-valuenow={optionRate}><span style={{ width: `${optionRate}%` }} /></div></div>
                         })}
-                        {question.type === 'multiple' && <p className="survey-result-footnote">Әр адам бірнеше нұсқа таңдай алады, сондықтан пайыздардың қосындысы 100%-дан асуы мүмкін. Толық дұрыс жауап бергендер: {percentage(result.correctCount ?? 0, result.responseCount)}%.</p>}
+                        {question.type === 'multiple' && <p className="survey-result-footnote">Пайыз әр нұсқаны таңдағандар санының осы сұраққа жауап бергендер санына қатынасын көрсетеді. Бірнеше нұсқа таңдауға болатындықтан, пайыздардың қосындысы 100%-дан асуы мүмкін. Барлық дұрыс нұсқаны дәл таңдағандар: {percentage(result.correctCount ?? 0, result.responseCount)}%.</p>}
                         {question.type === 'closed' && result.responseCount > 0 && <p className="survey-result-footnote">Қате жауап: {percentage(errors ?? 0, result.responseCount)}%.</p>}
                       </div>
                     )}

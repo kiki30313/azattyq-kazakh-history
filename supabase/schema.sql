@@ -496,11 +496,19 @@ create table if not exists public.survey_submissions (
   id uuid primary key default gen_random_uuid(),
   respondent_name text not null check (length(trim(respondent_name)) between 2 and 100),
   answers jsonb not null check (jsonb_typeof(answers) = 'object'),
+  device_id uuid,
   created_at timestamptz not null default now()
 );
 
+alter table public.survey_submissions
+  add column if not exists device_id uuid;
+
 create index if not exists survey_submissions_created_idx
   on public.survey_submissions (created_at desc);
+
+create unique index if not exists survey_submissions_device_id_unique_idx
+  on public.survey_submissions (device_id)
+  where device_id is not null;
 
 alter table public.survey_questions enable row level security;
 alter table public.survey_submissions enable row level security;
