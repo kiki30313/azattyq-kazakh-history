@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   ArrowRight,
   BookOpenText,
@@ -391,6 +391,12 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleNavLinkClick = (event: MouseEvent<HTMLAnchorElement>, page: PageId) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    navigateTo(page)
+  }
+
   const accountMenuItems: { id: PageId; label: string }[] = session
     ? [
         { id: 'profile', label: 'Жеке кабинет' },
@@ -612,10 +618,10 @@ function App() {
               <span className="wordmark-subtitle">KAZAKH HISTORY</span>
             </button>
             <nav className="desktop-nav" aria-label="Негізгі навигация">
-              {primaryNav.map((item, index) => <button key={`${item.label}-${index}`} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</button>)}
+              {primaryNav.map((item, index) => <a key={`${item.label}-${index}`} href={`#${item.id}`} onClick={(event) => handleNavLinkClick(event, item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</a>)}
             </nav>
             {desktopAccountItems.length > 0 && <nav className="desktop-account-nav" aria-label="Аккаунт">
-              {desktopAccountItems.map((item) => <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</button>)}
+              {desktopAccountItems.map((item) => <a key={item.id} href={`#${item.id}`} onClick={(event) => handleNavLinkClick(event, item.id)} className={activePage === item.id ? 'nav-link nav-link-active' : 'nav-link'}>{item.label}</a>)}
             </nav>}
             <div className="header-actions">
               <button type="button" onClick={() => setDarkMode((prev) => !prev)} className="theme-toggle" aria-label="Түстер режимін ауыстыру">{darkMode ? <SunMedium size={17} /> : <Moon size={17} />}</button>
