@@ -92,7 +92,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
 
     try {
-      const { data: session, error: sessionError } = await supabase
+      const { data: loadedSession, error: sessionError } = await supabase
         .from('classroom_quiz_sessions')
         .select('code, host_token_hash, question_ids, question_index, timer_seconds, status, question_ends_at')
         .eq('code', code)
@@ -101,7 +101,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
         console.error('Classroom session lookup failed', { code: sessionError.code ?? 'UNKNOWN' })
         return respondError(response, 503, 'Ойын сессиясын жүктеу мүмкін болмады.')
       }
-      if (!session) return respondError(response, 404, 'Бұл ойын коды табылмады.')
+      if (!loadedSession) return respondError(response, 404, 'Бұл ойын коды табылмады.')
+      let session = loadedSession
 
       const isHost = role === 'host' && session.host_token_hash === tokenHash(token)
       const { data: participant, error: participantError } = role === 'player'
@@ -117,7 +118,30 @@ export default async function handler(request: VercelRequest, response: VercelRe
       }
       if (!isHost && !participant) return respondError(response, 403, 'Ойынға қатысу кілті жарамсыз.')
 
-      const [{ data: participants, error: participantsError }, { data: answers, error: answersError }] = await Promise.all([
+      if (isHost) {
+        const { data: advancedSessions, error: advanceError } = await supabase
+          .rpc('advance_due_classroom_quiz', { p_session_code: code })
+        if (advanceError) {
+          console.error('Classroom timed question advance failed', { code: advanceError.code ?? 'UNKNOWN' })
+          const message = advanceError.code === 'PGRST202'
+            ? 'Supabase-та сұрақтарды ауыстыру функциялары жоқ. Актуалды supabase/schema.sql файлын SQL Editor-де орындаңыз.'
+            : 'Келесі сұрақты ашу мүмкін болмады.'
+          return respondError(response, 503, message)
+        }
+        if (advancedSessions?.[0]?.session) {
+          session = advancedSessions[0].session
+        } else {
+          return respondError(response, 503, 'Ойын күйін жаңарту мүмкін болмады.')
+        }
+      }
+
+      const questionId = (session.question_ids as string[])[session.question_index]
+      const question = questionId ? classroomQuestionsById.get(questionId) : undefined
+      const [
+        { data: participants, error: participantsError },
+        { data: answers, error: answersError },
+        { data: submitted, error: submittedError },
+      ] = await Promise.all([
         supabase.from('classroom_quiz_participants')
           .select('id, display_name, score, correct_count')
           .eq('session_code', code)
@@ -129,27 +153,27 @@ export default async function handler(request: VercelRequest, response: VercelRe
               .eq('session_code', code)
               .order('question_index', { ascending: true })
           : Promise.resolve({ data: [], error: null }),
+        session.status === 'running' && question
+          ? supabase.from('classroom_quiz_answers')
+              .select('participant_id')
+              .eq('session_code', code)
+              .eq('question_index', session.question_index)
+          : Promise.resolve({ data: [], error: null }),
       ])
-      if (participantsError || answersError) {
-        console.error('Classroom state query failed', { code: participantsError?.code ?? answersError?.code ?? 'UNKNOWN' })
+      if (participantsError || answersError || submittedError) {
+        console.error('Classroom state query failed', { code: participantsError?.code ?? answersError?.code ?? submittedError?.code ?? 'UNKNOWN' })
         return respondError(response, 503, 'Ойын нәтижелерін жүктеу мүмкін болмады.')
       }
-
-      const questionId = (session.question_ids as string[])[session.question_index]
-      const question = questionId ? classroomQuestionsById.get(questionId) : undefined
-      let answeredIds: string[] = []
-      if (session.status === 'running' && question) {
-        const { data: submitted, error: submittedError } = await supabase
-          .from('classroom_quiz_answers')
-          .select('participant_id')
-          .eq('session_code', code)
-          .eq('question_index', session.question_index)
-        if (submittedError) {
-          console.error('Classroom answer progress query failed', { code: submittedError.code ?? 'UNKNOWN' })
-          return respondError(response, 503, 'Жауап беру барысын жүктеу мүмкін болмады.')
-        }
-        answeredIds = (submitted ?? []).map((item) => item.participant_id)
+      const { data: databaseNow, error: clockError } = await supabase.rpc('classroom_quiz_server_time')
+      if (clockError || typeof databaseNow !== 'string') {
+        console.error('Classroom database clock lookup failed', { code: clockError?.code ?? 'UNKNOWN' })
+        const message = clockError?.code === 'PGRST202'
+          ? 'Supabase-та уақыт синхрондау функциясы жоқ. Актуалды supabase/schema.sql файлын орындаңыз.'
+          : 'Ойын уақытын синхрондау мүмкін болмады.'
+        return respondError(response, 503, message)
       }
+
+      const answeredIds = (submitted ?? []).map((item) => item.participant_id)
 
       const answerDetails = isHost && session.status === 'finished'
         ? (answers ?? []).map((answer) => ({
@@ -162,6 +186,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
       return response.status(200).json({
         code,
+        serverNow: databaseNow,
         status: session.status,
         questionIndex: session.question_index,
         questionCount: (session.question_ids as string[]).length,
@@ -282,23 +307,12 @@ export default async function handler(request: VercelRequest, response: VercelRe
     if (payload.action === 'start') {
       if (!isHost) return respondError(response, 403, 'Тек мұғалім ойынды бастай алады.')
       if (session.status !== 'waiting') return respondError(response, 409, 'Ойын басталған немесе аяқталған.')
-      const { count, error: countError } = await supabase.from('classroom_quiz_participants')
-        .select('id', { count: 'exact', head: true })
-        .eq('session_code', code)
-      if (countError) return respondError(response, 503, 'Қатысушылар санын тексеру мүмкін болмады.')
-      if (!count) return respondError(response, 409, 'Ойынды бастау үшін кемінде бір студент қосылуы керек.')
-      const now = new Date()
-      const { data: started, error } = await supabase.from('classroom_quiz_sessions')
-        .update({
-          status: 'running',
-          question_index: 0,
-          question_ends_at: new Date(now.getTime() + session.timer_seconds * 1000).toISOString(),
-        })
-        .eq('code', code)
-        .eq('status', 'waiting')
-        .select('code')
-        .maybeSingle()
-      if (error || !started) return respondError(response, 409, 'Ойынды бастау мүмкін болмады. Сессия күйін жаңартыңыз.')
+      const { data: started, error } = await supabase.rpc('start_classroom_quiz', { p_session_code: code })
+      if (error) {
+        console.error('Classroom game start failed', { code: error.code ?? 'UNKNOWN' })
+        return respondError(response, 503, 'Ойынды бастау мүмкін болмады. Supabase схемасын тексеріңіз.')
+      }
+      if (!started?.[0]) return respondError(response, 409, 'Ойынға кемінде бір студент қосылуы керек немесе сессия күйін жаңартыңыз.')
       return response.status(200).json({ status: 'running' })
     }
 
@@ -307,31 +321,25 @@ export default async function handler(request: VercelRequest, response: VercelRe
       if (session.status !== 'running' || !Number.isInteger(payload.questionIndex) || payload.questionIndex !== session.question_index) {
         return respondError(response, 409, 'Сұрақ күйі өзгерді. Экранды жаңартыңыз.')
       }
-      const { count: totalPlayers, error: playerCountError } = await supabase.from('classroom_quiz_participants')
-        .select('id', { count: 'exact', head: true })
-        .eq('session_code', code)
-      const { count: answeredPlayers, error: answerCountError } = await supabase.from('classroom_quiz_answers')
-        .select('id', { count: 'exact', head: true })
-        .eq('session_code', code)
-        .eq('question_index', session.question_index)
-      if (playerCountError || answerCountError) return respondError(response, 503, 'Жауап беру күйін тексеру мүмкін болмады.')
-      const timeExpired = !session.question_ends_at || Date.parse(session.question_ends_at) <= Date.now()
-      if (!timeExpired && (answeredPlayers ?? 0) < (totalPlayers ?? 0)) {
+      const { data: advancedSessions, error: advanceError } = await supabase
+        .rpc('advance_classroom_quiz', {
+          p_session_code: code,
+          p_question_index: session.question_index,
+        })
+      if (advanceError) {
+        console.error('Classroom question advance failed', { code: advanceError.code ?? 'UNKNOWN' })
+        const message = advanceError.code === 'PGRST202'
+          ? 'Supabase-та сұрақтарды ауыстыру функциялары жоқ. Актуалды supabase/schema.sql файлын SQL Editor-де орындаңыз.'
+          : 'Келесі сұраққа өту мүмкін болмады.'
+        return respondError(response, 503, message)
+      }
+      const advanced = advancedSessions?.[0]
+      if (!advanced) {
+        return respondError(response, 409, 'Сұрақ күйі өзгерді. Экранды жаңартыңыз.')
+      }
+      if (advanced.question_index === session.question_index && advanced.status === 'running') {
         return respondError(response, 409, 'Таймер біткенше немесе бәрі жауап бергенше күтіңіз.')
       }
-
-      const lastQuestion = session.question_index >= (session.question_ids as string[]).length - 1
-      const nextEnd = new Date(Date.now() + session.timer_seconds * 1000).toISOString()
-      const { data: advanced, error } = await supabase.from('classroom_quiz_sessions')
-        .update(lastQuestion
-          ? { status: 'finished' }
-          : { question_index: session.question_index + 1, question_ends_at: nextEnd })
-        .eq('code', code)
-        .eq('status', 'running')
-        .eq('question_index', session.question_index)
-        .select('status')
-        .maybeSingle()
-      if (error || !advanced) return respondError(response, 409, 'Сұрақты ауыстыру мүмкін болмады. Экранды жаңартыңыз.')
       return response.status(200).json({ status: advanced.status })
     }
 
@@ -341,9 +349,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       if (session.status !== 'running' || !Number.isInteger(questionIndex) || questionIndex !== session.question_index) {
         return respondError(response, 409, 'Бұл сұраққа жауап қабылданбайды.')
       }
-      if (!session.question_ends_at || Date.parse(session.question_ends_at) <= Date.now()) {
-        return respondError(response, 409, 'Уақыт аяқталды. Келесі сұрақты күтіңіз.')
-      }
+      if (!session.question_ends_at) return respondError(response, 409, 'Бұл сұраққа жауап қабылданбайды.')
       const questionId = (session.question_ids as string[])[session.question_index]
       const question = classroomQuestionsById.get(questionId)
       if (!question || typeof payload.answer !== 'string' || !question.options.includes(payload.answer)) {
@@ -356,16 +362,24 @@ export default async function handler(request: VercelRequest, response: VercelRe
         .maybeSingle()
       if (participantError || !participant) return respondError(response, 403, 'Қатысушыны тексеру мүмкін болмады.')
 
-      const { data: priorAnswer, error: priorError } = await supabase.from('classroom_quiz_answers')
-        .select('id')
-        .eq('participant_id', participant.id)
-        .eq('question_index', session.question_index)
-        .maybeSingle()
-      if (priorError) return respondError(response, 503, 'Алдыңғы жауабыңызды тексеру мүмкін болмады.')
+      const [
+        { data: priorAnswer, error: priorError },
+        { data: databaseNow, error: clockError },
+      ] = await Promise.all([
+        supabase.from('classroom_quiz_answers')
+          .select('id')
+          .eq('participant_id', participant.id)
+          .eq('question_index', session.question_index)
+          .maybeSingle(),
+        supabase.rpc('classroom_quiz_server_time'),
+      ])
+      if (priorError || clockError || typeof databaseNow !== 'string') {
+        return respondError(response, 503, 'Алдыңғы жауапты немесе уақытты тексеру мүмкін болмады.')
+      }
       if (priorAnswer) return respondError(response, 409, 'Бұл сұраққа жауабыңыз қабылданған.')
 
       const isCorrect = payload.answer === question.correctOption
-      const remainingRatio = Math.max(0, Date.parse(session.question_ends_at) - Date.now())
+      const remainingRatio = Math.max(0, Date.parse(session.question_ends_at) - Date.parse(databaseNow))
         / (session.timer_seconds * 1000)
       const points = isCorrect ? 100 + Math.floor(50 * remainingRatio) : 0
       const { error: answerError } = await supabase.rpc('submit_classroom_quiz_answer', {
