@@ -624,3 +624,112 @@ $$;
 
 revoke all on function public.get_public_survey_results() from public;
 grant execute on function public.get_public_survey_results() to anon, authenticated;
+
+create table if not exists public.classroom_quiz_sessions (
+  code text primary key check (code ~ '^[0-9]{6}$'),
+  host_token_hash text not null,
+  question_ids jsonb not null check (jsonb_typeof(question_ids) = 'array' and jsonb_array_length(question_ids) = 15),
+  question_index integer not null default 0 check (question_index between 0 and 14),
+  timer_seconds integer not null check (timer_seconds in (10, 15, 20)),
+  status text not null default 'waiting' check (status in ('waiting', 'running', 'finished')),
+  question_ends_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.classroom_quiz_sessions
+  drop constraint if exists classroom_quiz_sessions_timer_seconds_check;
+alter table public.classroom_quiz_sessions
+  add constraint classroom_quiz_sessions_timer_seconds_check
+  check (timer_seconds in (10, 15, 20));
+
+create table if not exists public.classroom_quiz_participants (
+  id uuid primary key default gen_random_uuid(),
+  session_code text not null references public.classroom_quiz_sessions(code) on delete cascade,
+  display_name text not null check (length(trim(display_name)) between 2 and 40),
+  token_hash text not null,
+  score integer not null default 0 check (score >= 0),
+  correct_count integer not null default 0 check (correct_count between 0 and 15),
+  joined_at timestamptz not null default now()
+);
+
+create unique index if not exists classroom_quiz_participant_name_unique_idx
+  on public.classroom_quiz_participants (session_code, lower(display_name));
+create index if not exists classroom_quiz_participants_score_idx
+  on public.classroom_quiz_participants (session_code, score desc, joined_at);
+
+create table if not exists public.classroom_quiz_answers (
+  id uuid primary key default gen_random_uuid(),
+  session_code text not null references public.classroom_quiz_sessions(code) on delete cascade,
+  participant_id uuid not null references public.classroom_quiz_participants(id) on delete cascade,
+  question_index integer not null check (question_index between 0 and 14),
+  answer_text text not null check (length(answer_text) between 1 and 300),
+  is_correct boolean not null,
+  points integer not null check (points between 0 and 150),
+  answered_at timestamptz not null default now(),
+  unique (participant_id, question_index)
+);
+
+create index if not exists classroom_quiz_answers_session_idx
+  on public.classroom_quiz_answers (session_code, question_index);
+
+alter table public.classroom_quiz_sessions enable row level security;
+alter table public.classroom_quiz_participants enable row level security;
+alter table public.classroom_quiz_answers enable row level security;
+
+revoke all on public.classroom_quiz_sessions, public.classroom_quiz_participants, public.classroom_quiz_answers
+  from public, anon, authenticated;
+grant all on public.classroom_quiz_sessions, public.classroom_quiz_participants, public.classroom_quiz_answers
+  to service_role;
+
+create or replace function public.submit_classroom_quiz_answer(
+  p_session_code text,
+  p_participant_id uuid,
+  p_question_index integer,
+  p_answer_text text,
+  p_is_correct boolean,
+  p_points integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  active_session public.classroom_quiz_sessions%rowtype;
+begin
+  select * into active_session
+  from public.classroom_quiz_sessions
+  where code = p_session_code
+  for update;
+
+  if not found
+    or active_session.status <> 'running'
+    or active_session.question_index <> p_question_index
+    or active_session.question_ends_at <= now() then
+    raise exception 'Question is no longer accepting answers' using errcode = 'P0001';
+  end if;
+
+  if p_points < 0 or p_points > 150 or length(p_answer_text) not between 1 and 300
+    or not exists (
+      select 1
+      from public.classroom_quiz_participants
+      where id = p_participant_id and session_code = p_session_code
+    ) then
+    raise exception 'Invalid answer submission' using errcode = 'P0001';
+  end if;
+
+  insert into public.classroom_quiz_answers (
+    session_code, participant_id, question_index, answer_text, is_correct, points
+  ) values (
+    p_session_code, p_participant_id, p_question_index, p_answer_text, p_is_correct, p_points
+  );
+
+  update public.classroom_quiz_participants
+  set score = score + p_points,
+      correct_count = correct_count + case when p_is_correct then 1 else 0 end
+  where id = p_participant_id and session_code = p_session_code;
+end;
+$$;
+
+revoke all on function public.submit_classroom_quiz_answer(text, uuid, integer, text, boolean, integer) from public, anon, authenticated;
+grant execute on function public.submit_classroom_quiz_answer(text, uuid, integer, text, boolean, integer) to service_role;

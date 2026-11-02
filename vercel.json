@@ -15,6 +15,9 @@
     },
     "api/survey.ts": {
       "maxDuration": 10
+    },
+    "api/classroom.ts": {
+      "maxDuration": 10
     }
   },
   "headers": [

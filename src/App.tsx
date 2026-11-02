@@ -25,6 +25,7 @@ import VerifiedQuiz from './components/VerifiedQuiz'
 import type { MapLocation } from './components/HistoricalMap'
 
 const HistoricalMap = lazy(() => import('./components/HistoricalMap'))
+const ClassroomQuiz = lazy(() => import('./components/ClassroomQuiz'))
 
 type TimelineEvent = {
   year: string
@@ -116,7 +117,7 @@ const pageAliases: Record<string, PageId> = {
 }
 
 const getPageFromHash = (): PageId => {
-  const hash = window.location.hash.slice(1).replace(/^\/+/, '')
+  const hash = window.location.hash.slice(1).split('?')[0].replace(/^\/+/, '')
   if (['login', 'register', 'reset-password', 'profile', 'admin'].includes(hash)) return hash as PageId
   const path = window.location.pathname.replace(/\/+$/, '').split('/').pop() ?? ''
   const pathPage = ['login', 'register', 'reset-password', 'profile', 'admin'].find((page) => page === path)
@@ -787,6 +788,9 @@ function App() {
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">{gameTabs.map((game) => { const result = gameResults[game.key]; return <div key={game.key} className="rounded-[18px] border border-slate-700 bg-slate-950/50 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">{game.label}</p><p className="mt-2 text-xl font-bold text-white">{result.score} {game.key === 'quiz' ? 'серверлік ұпай' : 'жаттығу ұпайы'}</p><p className="text-sm text-slate-300">{result.done ? 'Аяқталды' : 'Орындалмады'}</p></div>})}</div>
               </div>
             )}
+            <Suspense fallback={<div className="classroom-wait">Сынып ойыны жүктелуде…</div>}>
+              <ClassroomQuiz />
+            </Suspense>
           </section>
           )}
 
