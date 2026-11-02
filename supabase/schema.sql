@@ -733,3 +733,158 @@ $$;
 
 revoke all on function public.submit_classroom_quiz_answer(text, uuid, integer, text, boolean, integer) from public, anon, authenticated;
 grant execute on function public.submit_classroom_quiz_answer(text, uuid, integer, text, boolean, integer) to service_role;
+
+drop function if exists public.advance_due_classroom_quiz(text);
+create function public.advance_due_classroom_quiz(p_session_code text)
+returns table(session jsonb, server_now timestamptz)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  active_session public.classroom_quiz_sessions%rowtype;
+  database_now timestamptz;
+begin
+  select * into active_session
+  from public.classroom_quiz_sessions
+  where code = p_session_code
+  for update;
+
+  if not found then
+    return;
+  end if;
+
+  database_now := clock_timestamp();
+  if active_session.status <> 'running'
+    or active_session.question_ends_at is null
+    or active_session.question_ends_at > database_now then
+    return query select to_jsonb(active_session), database_now;
+    return;
+  end if;
+
+  if active_session.question_index >= jsonb_array_length(active_session.question_ids) - 1 then
+    update public.classroom_quiz_sessions
+    set status = 'finished', question_ends_at = null
+    where code = p_session_code
+    returning * into active_session;
+  else
+    update public.classroom_quiz_sessions
+    set question_index = question_index + 1,
+        question_ends_at = clock_timestamp() + make_interval(secs => timer_seconds)
+    where code = p_session_code
+    returning * into active_session;
+  end if;
+
+  return query select to_jsonb(active_session), clock_timestamp();
+end;
+$$;
+
+create or replace function public.classroom_quiz_server_time()
+returns timestamptz
+language sql
+volatile
+security definer
+set search_path = public
+as $$
+  select clock_timestamp();
+$$;
+
+create or replace function public.start_classroom_quiz(p_session_code text)
+returns setof public.classroom_quiz_sessions
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  active_session public.classroom_quiz_sessions%rowtype;
+  total_players integer;
+begin
+  select * into active_session
+  from public.classroom_quiz_sessions
+  where code = p_session_code
+  for update;
+
+  if not found or active_session.status <> 'waiting' then
+    return;
+  end if;
+
+  select count(*) into total_players
+  from public.classroom_quiz_participants
+  where session_code = p_session_code;
+  if total_players = 0 then
+    return;
+  end if;
+
+  update public.classroom_quiz_sessions
+  set status = 'running',
+      question_index = 0,
+      question_ends_at = clock_timestamp() + make_interval(secs => timer_seconds)
+  where code = p_session_code
+  returning * into active_session;
+
+  return next active_session;
+end;
+$$;
+
+create or replace function public.advance_classroom_quiz(p_session_code text, p_question_index integer)
+returns setof public.classroom_quiz_sessions
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  active_session public.classroom_quiz_sessions%rowtype;
+  total_players integer;
+  answered_players integer;
+  database_now timestamptz;
+begin
+  select * into active_session
+  from public.classroom_quiz_sessions
+  where code = p_session_code
+  for update;
+
+  if not found or active_session.status <> 'running'
+    or active_session.question_index <> p_question_index then
+    return;
+  end if;
+
+  database_now := clock_timestamp();
+  select count(*) into total_players
+  from public.classroom_quiz_participants
+  where session_code = p_session_code;
+  select count(*) into answered_players
+  from public.classroom_quiz_answers
+  where session_code = p_session_code and question_index = p_question_index;
+
+  if active_session.question_ends_at > database_now and answered_players < total_players then
+    return next active_session;
+    return;
+  end if;
+
+  if active_session.question_index >= jsonb_array_length(active_session.question_ids) - 1 then
+    update public.classroom_quiz_sessions
+    set status = 'finished', question_ends_at = null
+    where code = p_session_code
+    returning * into active_session;
+  else
+    update public.classroom_quiz_sessions
+    set question_index = question_index + 1,
+        question_ends_at = clock_timestamp() + make_interval(secs => timer_seconds)
+    where code = p_session_code
+    returning * into active_session;
+  end if;
+
+  return next active_session;
+end;
+$$;
+
+revoke all on function public.advance_due_classroom_quiz(text) from public, anon, authenticated;
+grant execute on function public.advance_due_classroom_quiz(text) to service_role;
+revoke all on function public.classroom_quiz_server_time() from public, anon, authenticated;
+grant execute on function public.classroom_quiz_server_time() to service_role;
+revoke all on function public.start_classroom_quiz(text) from public, anon, authenticated;
+grant execute on function public.start_classroom_quiz(text) to service_role;
+revoke all on function public.advance_classroom_quiz(text, integer) from public, anon, authenticated;
+grant execute on function public.advance_classroom_quiz(text, integer) to service_role;
+
+notify pgrst, 'reload schema';

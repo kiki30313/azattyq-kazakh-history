@@ -7,6 +7,7 @@ type Participant = { name: string; score: number; correctCount: number; hasAnswe
 type AnswerDetail = { questionNumber: number; question: string; name: string; answer: string }
 type GameState = {
   code: string
+  serverNow: string
   status: 'waiting' | 'running' | 'finished'
   questionIndex: number
   questionCount: number
@@ -20,6 +21,14 @@ type GameState = {
 }
 type StoredGame = { role: Role; code: string; token: string; name?: string }
 type ApiFailure = { error?: string }
+class ClassroomRequestError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
 
 const STORAGE_KEY = 'azattyq-classroom-quiz'
 const CLASSROOM_API_URL = `${(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')}/api/classroom`
@@ -51,7 +60,7 @@ async function postGame(payload: Record<string, unknown>) {
     body: JSON.stringify(payload),
   })
   const data = await response.json() as ApiFailure & Record<string, unknown>
-  if (!response.ok) throw new Error(data.error || 'Ойын сұрауын орындау мүмкін болмады.')
+  if (!response.ok) throw new ClassroomRequestError(data.error || 'Ойын сұрауын орындау мүмкін болмады.', response.status)
   return data
 }
 
@@ -67,15 +76,22 @@ export default function ClassroomQuiz() {
   const [isBusy, setIsBusy] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [submittedAnswer, setSubmittedAnswer] = useState<{ questionIndex: number; answer: string } | null>(null)
-  const [clockNow, setClockNow] = useState(() => Date.now())
+  const [clockNow, setClockNow] = useState(() => performance.now())
+  const [clockSync, setClockSync] = useState<{ serverNow: number; performanceNow: number } | null>(null)
   const advancedQuestion = useRef(-1)
+  const answerInFlight = useRef<number | null>(null)
+  const stateRequestSequence = useRef(0)
+  const latestAppliedStateRequest = useRef(0)
   const selectedAnswer = gameState && submittedAnswer?.questionIndex === gameState.questionIndex
     ? submittedAnswer.answer
     : ''
+  const playerHasAnswered = gameState?.participants.find((participant) => participant.name === game?.name)?.hasAnswered ?? Boolean(selectedAnswer)
   const isQrJoin = Boolean(joinCode)
 
-  const refreshState = useCallback(async (active: boolean) => {
-    if (!game) return
+  const refreshState = useCallback(async (isActive: () => boolean = () => true): Promise<GameState | null> => {
+    if (!game) return null
+    const requestId = ++stateRequestSequence.current
+    const localRequestStartedAt = performance.now()
     try {
       const params = new URLSearchParams({
         action: 'state',
@@ -85,12 +101,22 @@ export default function ClassroomQuiz() {
       })
       const response = await fetch(`${CLASSROOM_API_URL}?${params}`, { headers: { Accept: 'application/json' } })
       const data = await response.json() as GameState & ApiFailure
+      const localResponseReceivedAt = performance.now()
       if (!response.ok) throw new Error(data.error || 'Ойын күйін жаңарту мүмкін болмады.')
-      if (!active) return
+      const serverNow = Date.parse(data.serverNow)
+      if (!Number.isFinite(serverNow)) throw new Error('Сервер уақытын синхрондау мүмкін болмады. Бетті жаңартыңыз.')
+      if (!isActive() || requestId < latestAppliedStateRequest.current) return data
+      latestAppliedStateRequest.current = requestId
+      setClockSync({
+        serverNow: serverNow + (localResponseReceivedAt - localRequestStartedAt) / 2,
+        performanceNow: localResponseReceivedAt,
+      })
       setGameState(data)
       setError('')
+      return data
     } catch (requestError) {
-      if (active) setError(requestError instanceof Error ? requestError.message : 'Ойын серверіне қосылу мүмкін болмады.')
+      if (isActive()) setError(requestError instanceof Error ? requestError.message : 'Ойын серверіне қосылу мүмкін болмады.')
+      return null
     }
   }, [game])
 
@@ -107,12 +133,15 @@ export default function ClassroomQuiz() {
   useEffect(() => {
     let active = true
     if (game) {
-      const initialRequest = window.setTimeout(() => void refreshState(active), 0)
-      const interval = window.setInterval(() => void refreshState(active), 1000)
+      let timeout = 0
+      const poll = async () => {
+        await refreshState(() => active)
+        if (active) timeout = window.setTimeout(() => void poll(), 1000)
+      }
+      timeout = window.setTimeout(() => void poll(), 0)
       return () => {
         active = false
-        window.clearTimeout(initialRequest)
-        window.clearInterval(interval)
+        window.clearTimeout(timeout)
       }
     }
     return () => { active = false }
@@ -121,27 +150,30 @@ export default function ClassroomQuiz() {
   useEffect(() => {
     const endsAt = gameState?.endsAt
     if (gameState?.status !== 'running' || !endsAt) return
-    const interval = window.setInterval(() => setClockNow(Date.now()), 200)
+    const interval = window.setInterval(() => setClockNow(performance.now()), 100)
     return () => window.clearInterval(interval)
   }, [gameState?.endsAt, gameState?.status])
 
   const remainingSeconds = gameState?.endsAt
-    ? Math.max(0, Math.ceil((Date.parse(gameState.endsAt) - clockNow) / 1000))
+    ? Math.max(0, Math.ceil((
+        Date.parse(gameState.endsAt)
+        - (clockSync ? clockSync.serverNow + clockNow - clockSync.performanceNow : Date.parse(gameState.serverNow))
+      ) / 1000))
     : gameState?.timerSeconds ?? 20
+  const questionTransitioning = gameState?.status === 'running' && remainingSeconds <= 0
 
   useEffect(() => {
     if (game?.role !== 'host' || gameState?.status !== 'running' || !gameState.question) return
-    const timeExpired = remainingSeconds <= 0
     const everyoneAnswered = gameState.participants.length > 0
       && gameState.currentAnsweredCount >= gameState.participants.length
-    if ((!timeExpired && !everyoneAnswered) || advancedQuestion.current === gameState.questionIndex) return
+    if (!everyoneAnswered || advancedQuestion.current === gameState.questionIndex) return
     advancedQuestion.current = gameState.questionIndex
     void postGame({
       action: 'advance',
       code: game.code,
       token: game.token,
       questionIndex: gameState.questionIndex,
-    }).then(() => refreshState(true))
+    }).then(() => refreshState())
       .catch((requestError: unknown) => {
         advancedQuestion.current = -1
         setError(requestError instanceof Error ? requestError.message : 'Келесі сұраққа өту мүмкін болмады.')
@@ -211,7 +243,7 @@ export default function ClassroomQuiz() {
     setError('')
     try {
       await postGame({ action: 'start', code: game.code, token: game.token })
-      await refreshState(true)
+      await refreshState()
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Ойынды бастау мүмкін болмады.')
     } finally {
@@ -220,22 +252,40 @@ export default function ClassroomQuiz() {
   }
 
   const submitAnswer = async (answer: string) => {
-    if (!game || !gameState || game.role !== 'player' || selectedAnswer) return
-    setSubmittedAnswer({ questionIndex: gameState.questionIndex, answer })
+    if (!game || !gameState || game.role !== 'player' || selectedAnswer || playerHasAnswered
+      || answerInFlight.current === gameState.questionIndex) return
+    const questionIndex = gameState.questionIndex
+    answerInFlight.current = questionIndex
+    setSubmittedAnswer({ questionIndex, answer })
     setError('')
     try {
       await postGame({
         action: 'answer',
         code: game.code,
         token: game.token,
-        questionIndex: gameState.questionIndex,
+        questionIndex,
         answer,
       })
+      answerInFlight.current = null
       setNotice('Жауабыңыз қабылданды. Келесі сұрақты күтіңіз.')
-      await refreshState(true)
+      await refreshState()
     } catch (requestError) {
-      setSubmittedAnswer(null)
-      setError(requestError instanceof Error ? requestError.message : 'Жауапты жіберу мүмкін болмады.')
+      const refreshedState = await refreshState()
+      const answerWasAccepted = refreshedState?.participants.some(
+        (participant) => participant.name === game.name && participant.hasAnswered,
+      )
+      if (answerWasAccepted) {
+        answerInFlight.current = null
+        setError('')
+        setNotice('Жауабыңыз қабылданды. Келесі сұрақты күтіңіз.')
+      } else if (refreshedState && requestError instanceof ClassroomRequestError
+        && requestError.status >= 400 && requestError.status < 500 && requestError.status !== 409) {
+        answerInFlight.current = null
+        setSubmittedAnswer(null)
+        setError(requestError.message)
+      } else {
+        setNotice('Жауабыңыз серверде тексеріліп жатыр. Экранды жаппаңыз.')
+      }
     }
   }
 
@@ -262,8 +312,6 @@ export default function ClassroomQuiz() {
   const progress = gameState?.question
     ? Math.max(0, Math.min(100, (remainingSeconds / gameState.timerSeconds) * 100))
     : 100
-  const playerHasAnswered = gameState?.participants.find((participant) => participant.name === game?.name)?.hasAnswered ?? Boolean(selectedAnswer)
-
   return (
     <section id="classroom-quiz" className="classroom-quiz" aria-labelledby="classroom-quiz-title">
       <header className="classroom-quiz-heading">
@@ -339,7 +387,7 @@ export default function ClassroomQuiz() {
 
           {gameState.status === 'running' && gameState.question && (
             <div className="classroom-question-panel">
-              <div className="classroom-question-meta"><span>{gameState.questionIndex + 1} / {gameState.questionCount} сұрақ</span><strong className={remainingSeconds <= 5 ? 'is-urgent' : ''}>{remainingSeconds} сек</strong></div>
+              <div className="classroom-question-meta"><span>{gameState.questionIndex + 1} / {gameState.questionCount} сұрақ</span><strong className={remainingSeconds <= 5 ? 'is-urgent' : ''}>{questionTransitioning ? 'Келесі сұрақ…' : `${remainingSeconds} сек`}</strong></div>
               <div className="classroom-timer-track" role="progressbar" aria-label="Сұраққа қалған уақыт" aria-valuemin={0} aria-valuemax={gameState.timerSeconds} aria-valuenow={remainingSeconds}><span style={{ width: `${progress}%` }} /></div>
               <h3>{gameState.question.prompt}</h3>
               {game.role === 'host' ? (
@@ -350,7 +398,7 @@ export default function ClassroomQuiz() {
                 </div>
               ) : (
                 <div className="classroom-answer-options">
-                  {gameState.question.options.map((option, index) => <button type="button" key={option} disabled={playerHasAnswered || remainingSeconds <= 0} className={selectedAnswer === option ? 'is-selected' : ''} onClick={() => void submitAnswer(option)}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}
+                  {gameState.question.options.map((option, index) => <button type="button" key={option} disabled={playerHasAnswered || Boolean(selectedAnswer) || questionTransitioning} className={selectedAnswer === option ? 'is-selected' : ''} onClick={() => void submitAnswer(option)}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}
                   {playerHasAnswered && <p className="classroom-wait-note"><Check size={16} /> Жауабыңыз қабылданды. Мұғалім келесі сұраққа өткізгенше күтіңіз.</p>}
                 </div>
               )}
