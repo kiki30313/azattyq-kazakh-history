@@ -17,9 +17,6 @@ type SurveySubmission = {
 const MAX_BODY_BYTES = 16 * 1024
 const MAX_NAME_LENGTH = 100
 const MAX_OPEN_ANSWER_LENGTH = 1000
-const RATE_WINDOW_MS = 10 * 60 * 1000
-const RATE_LIMIT = 5
-const rateBuckets = new Map<string, { count: number; resetAt: number }>()
 
 const setSecurityHeaders = (response: VercelResponse) => {
   response.setHeader('Cache-Control', 'no-store')
@@ -45,30 +42,6 @@ const allowRequestOrigin = (request: VercelRequest, response: VercelResponse) =>
   if (!configuredOrigins.includes(requestOrigin)) return false
   response.setHeader('Access-Control-Allow-Origin', requestOrigin)
   return true
-}
-
-const getClientKey = (request: VercelRequest) => {
-  const forwardedFor = request.headers['x-forwarded-for']
-  return typeof forwardedFor === 'string'
-    ? forwardedFor.split(',').pop()?.trim() || 'unknown'
-    : 'unknown'
-}
-
-const isRateLimited = (request: VercelRequest) => {
-  const clientKey = getClientKey(request)
-  const now = Date.now()
-  for (const [key, bucket] of rateBuckets) {
-    if (bucket.resetAt <= now) rateBuckets.delete(key)
-  }
-
-  const bucket = rateBuckets.get(clientKey)
-  if (!bucket || bucket.resetAt <= now) {
-    rateBuckets.set(clientKey, { count: 1, resetAt: now + RATE_WINDOW_MS })
-    return false
-  }
-  if (bucket.count >= RATE_LIMIT) return true
-  bucket.count += 1
-  return false
 }
 
 const parseBody = (request: VercelRequest): unknown => {
@@ -149,6 +122,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
         const { data: userData, error: authError } = await supabase.auth.getUser(accessToken)
         if (authError || !userData.user) {
+          console.warn('Survey admin authentication failed', { code: authError?.code ?? 'NO_USER' })
           return respondError(response, 401, 'Сессия жарамсыз. Қайта кіріп көріңіз.')
         }
 
@@ -197,11 +171,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
       })
       return respondError(response, 503, 'Сауалнама нәтижелерін жүктеу мүмкін болмады.')
     }
-  }
-
-  if (isRateLimited(request)) {
-    response.setHeader('Retry-After', String(RATE_WINDOW_MS / 1000))
-    return respondError(response, 429, 'Жауап жіберу шегіне жеттіңіз. Кейінірек қайталап көріңіз.')
   }
 
   const body = parseBody(request)

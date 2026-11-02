@@ -55,9 +55,19 @@ type AdminSurveyResponses = {
 }
 
 async function fetchAdminSurveyResponses(accessToken: string, offset: number): Promise<AdminSurveyResponses> {
-  const response = await fetch(`${surveyApiUrl}?view=responses&offset=${offset}`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+  const request = (token: string) => fetch(`${surveyApiUrl}?view=responses&offset=${offset}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
   })
+
+  let response = await request(accessToken)
+  if (response.status === 401 && supabase) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession()
+    if (refreshError || !refreshed.session) {
+      throw new Error('Әкімші сессиясының мерзімі аяқталған. Қайта кіріп көріңіз.')
+    }
+    response = await request(refreshed.session.access_token)
+  }
+
   const data = await response.json() as AdminSurveyResponses & { error?: string }
   if (!response.ok) throw new Error(data.error || 'Сауалнама жауаптарын жүктеу мүмкін болмады.')
   return data
@@ -217,6 +227,7 @@ export function AdminDashboard() {
   const [hasMoreSurveyResponses, setHasMoreSurveyResponses] = useState(false)
   const [isLoadingSurveyResponses, setIsLoadingSurveyResponses] = useState(true)
   const [surveyResponseError, setSurveyResponseError] = useState('')
+  const [surveyResponseRetry, setSurveyResponseRetry] = useState(0)
   const [selected, setSelected] = useState<AdminDetail | null>(null)
   const [reason, setReason] = useState('')
   const [comment, setComment] = useState('')
@@ -278,7 +289,7 @@ export function AdminDashboard() {
         if (active) setIsLoadingSurveyResponses(false)
       })
     return () => { active = false }
-  }, [session])
+  }, [session, surveyResponseRetry])
 
   const loadMoreSurveyResponses = async () => {
     if (!session || isLoadingSurveyResponses) return
@@ -361,7 +372,9 @@ export function AdminDashboard() {
         {surveyResponseError && <AccountMessage>{surveyResponseError}</AccountMessage>}
         {isLoadingSurveyResponses && surveyResponses.length === 0
           ? <p className="account-empty">Жауаптар жүктелуде…</p>
-          : surveyResponses.length === 0
+          : surveyResponseError && surveyResponses.length === 0
+            ? <button type="button" className="account-secondary" onClick={() => setSurveyResponseRetry((retry) => retry + 1)}>Қайта жүктеу</button>
+            : surveyResponses.length === 0
             ? <p className="account-empty">Әзірге сауалнама жауабы жоқ.</p>
             : <div className="admin-survey-response-list">{surveyResponses.map((submission) => (
               <details className="admin-survey-response" key={submission.id}>
