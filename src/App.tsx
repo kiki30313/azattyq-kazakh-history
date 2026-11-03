@@ -91,6 +91,7 @@ const navItems = [
   { id: 'timeline', label: 'Хронология' },
   { id: 'knowledge', label: 'Тарихи деректер' },
   { id: 'study', label: 'Оқу материалы' },
+  { id: 'videos', label: 'Тарихи видеолар' },
   { id: 'games', label: 'Сауалнама' },
   { id: 'library', label: 'Сөздік және AI тарихшы' },
   { id: 'result', label: 'Нәтиже' },
@@ -104,6 +105,7 @@ const primaryNav: { id: PageId; label: string }[] = [
   { id: 'timeline', label: 'Хронология' },
   { id: 'knowledge', label: 'Тұлғалар' },
   { id: 'knowledge', label: 'Деректер' },
+  { id: 'videos', label: 'Видеолар' },
   { id: 'games', label: 'Сауалнама' },
 ]
 
@@ -767,7 +769,9 @@ function App() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{['Көтерілістің алғышарттары', 'Негізгі себептері', 'Қозғаушы күштері', 'Көтерілістің басталуы', 'Негізгі кезеңдері', 'Маңызды шайқастар', 'Кенесарының саяси мақсаттары', 'Жеңіліс себептері', 'Нәтижелері және салдары', 'Тарихи маңызы'].map((topic, index) => <div key={topic} className="rounded-[20px] border border-slate-700 bg-slate-950/50 p-4"><div className="mb-2 text-sm font-medium text-amber-300">{index + 1}</div><h3 className="text-lg font-semibold text-white">{topic}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{index === 0 && 'Ресейдің отарлау саясаты, жер мәселесі, әкімшілік қысым, дін мен ұлттық сана-сезімнің сабақтастығы.'}{index === 1 && 'Қазақ қоғамының экономикалық, әскери және саяси қысымы көтеріліс үшін жағдай жасады.'}{index === 2 && 'Батырлар, би-шешендер, жергілікті қауымдар және хан жағдауына негізделген күштер.'}{index === 3 && '1837 жылы Кенесарының бастамасымен қозғалыс кең ауқымды әлеуметтік және әскери сипат алды.'}{index === 4 && 'Бастапқы жайылған шағын тізбектен, кең көлемді әскери және саяси дағдарысқа дейін.'}{index === 5 && 'Ақмола, Көкшетау, Ұлытау, Жетісу мен Жайық маңындағы шайқастардың рөлі.'}{index === 6 && 'Кенесарының жаңа билік құрғысы, дербестік, жанұяның әрі қарай нығайтуы.'}{index === 7 && 'Ресейдің әскери, әр түрлі қару-жарақ, шектеулі логистика және сыртқы саяси қысым.'}{index === 8 && 'Қоғамдық құбылыстар, саясаттағы салдар, кейінгі тарихта өткен сабақтар.'}{index === 9 && 'Ұлт-азаттық идеялар, тарихтың сабақтастығы, бүгінгі Қазақстан үшін маңызы.'}</p></div>)}</div>
           </section>
 
-          <section className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
+          </div>}
+
+          {activePage === 'videos' && <section id="videos" className="editorial-section rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
             <div className="mb-6 flex items-center gap-3"><Globe className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Бейнематериалдар</p><h2 className="text-3xl font-bold text-white">YouTube-тағы дереккөздер</h2></div></div>
             <div className="grid gap-4 lg:grid-cols-2">{videoLinks.map((video) => <article key={video.id} className="overflow-hidden rounded-[22px] border border-slate-700 bg-slate-950/60">
               <div className="aspect-video bg-slate-950">
@@ -789,7 +793,7 @@ function App() {
               </div>
             </article>)}</div>
           </section>
-          </div>}
+          }
 
           {activePage === 'games' && (
           <section id="games" className="survey-page">
