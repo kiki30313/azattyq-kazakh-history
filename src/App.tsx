@@ -8,7 +8,6 @@ import {
   MapPinned,
   Menu,
   Moon,
-  Play,
   Printer,
   Search,
   SunMedium,
@@ -300,9 +299,10 @@ const gameTabs = [
 ] as const
 
 const videoLinks = [
-  { title: 'Қазақ тарихы: Кенесары көтерілісі', description: 'Кенесары Қасымұлы көтерілісінің базалық тарихи мазмұны.', url: 'https://www.youtube.com/results?search_query=%D2%9B%D0%B0%D0%B7%D0%B0%D2%9B+%D1%82%D0%B0%D1%80%D0%B8%D1%85%D1%8B+%D0%9A%D0%B5%D0%BD%D0%B5%D1%81%D0%B0%D1%80%D1%8B+%D2%9B%D0%BE%D1%82%D0%B5%D1%80%D1%96%D1%81%D1%96' },
-  { title: 'Исатай мен Махамбет: халықтық қозғалыс', description: 'Оңтүстік және Орал өңіріндегі ұлт-азаттық күрестің негізгі түсінігі.', url: 'https://www.youtube.com/results?search_query=%D0%98%D1%81%D0%B0%D1%82%D0%B0%D0%B9+%D0%BC%D0%B5%D0%BD+%D0%9C%D0%B0%D1%85%D0%B0%D0%BC%D0%B1%D0%B5%D1%82+%D2%9A%D0%B0%D0%B7%D0%B0%D2%9B+%D1%82%D0%B0%D1%80%D0%B8%D1%85%D1%8B' },
-  { title: 'Ұлт-азаттық көтерілістер: XIX–XX ғасыр', description: 'Тарихи үрдістің әртүрлі кезеңдерінің салыстырмалы көрінісі.', url: 'https://www.youtube.com/results?search_query=%D2%B1%D0%BB%D1%82+%D0%B0%D0%B7%D0%B0%D1%82%D1%82%D1%8B%D2%9B+%D0%BA%D3%A9%D1%82%D0%B5%D1%80%D1%96%D0%BB%D1%96%D1%81%D1%82%D0%B5%D1%80' },
+  { id: '0lIiDwFEYso', title: 'Кенесары Қасымұлы бастаған ұлт-азаттық қозғалыс', description: 'Кенесары хан бастаған қозғалыстың себептері мен негізгі оқиғалары.', channel: 'EASY TARIH' },
+  { id: 'eLDOJpoeRec', title: 'Сырым Датұлы бастаған ұлт-азаттық қозғалыс', description: 'Сырым Датұлы көтерілісі туралы Қазақстан тарихы сабағы.', channel: 'QHistory' },
+  { id: 'gZaKKXsT-k4', title: 'Исатай мен Махамбет бастаған көтеріліс', description: '1836–1838 жылдардағы Бөкей Ордасындағы көтеріліс туралы бейнесабақ.', channel: 'Altin Bektas' },
+  { id: '1VuoyQpBLeY', title: '1916 жылғы ұлт-азаттық көтеріліс', description: '1916 жылғы ұлт-азаттық қозғалыстың негізгі оқиғалары.', channel: 'Жадыра Көшербаева' },
 ]
 
 function App() {
@@ -769,7 +769,25 @@ function App() {
 
           <section className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 md:p-8">
             <div className="mb-6 flex items-center gap-3"><Globe className="text-amber-300" /><div><p className="text-xs uppercase tracking-[0.25em] text-slate-400">Бейнематериалдар</p><h2 className="text-3xl font-bold text-white">YouTube-тағы дереккөздер</h2></div></div>
-            <div className="grid gap-4 lg:grid-cols-3">{videoLinks.map((video) => <div key={video.title} className="rounded-[22px] border border-slate-700 bg-slate-950/60 p-4"><div className="mb-3 flex h-36 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-sky-500/20 text-amber-200"><Play size={28} /></div><h3 className="text-xl font-semibold text-white">{video.title}</h3><p className="mt-2 text-sm leading-6 text-slate-300">{video.description}</p><a href={video.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-300">Қарау <ArrowRight size={16} /></a></div>)}</div>
+            <div className="grid gap-4 lg:grid-cols-2">{videoLinks.map((video) => <article key={video.id} className="overflow-hidden rounded-[22px] border border-slate-700 bg-slate-950/60">
+              <div className="aspect-video bg-slate-950">
+                <iframe
+                  className="h-full w-full"
+                  src={`https://www.youtube-nocookie.com/embed/${video.id}`}
+                  title={video.title}
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <div className="p-4">
+                <h3 className="text-xl font-semibold text-white">{video.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{video.description}</p>
+                <p className="mt-3 text-xs text-slate-400">YouTube арнасы: {video.channel}</p>
+                <a href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-amber-300">YouTube-та ашу <ArrowRight size={16} /></a>
+              </div>
+            </article>)}</div>
           </section>
           </div>}
 
